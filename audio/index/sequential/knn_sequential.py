@@ -2,7 +2,7 @@ import os
 import numpy as np
 from heapq import heappush, heappop
 from sklearn.preprocessing import normalize
-from config import HIST_DIR
+from audio.config import HIST_DIR
 
 
 class KNNSequential:

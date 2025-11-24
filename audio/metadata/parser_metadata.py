@@ -35,7 +35,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
-from config_metadata import (
+from audio.config_metadata import (
     METADATA_DIR,
     PARSED_METADATA_PATH
 )
