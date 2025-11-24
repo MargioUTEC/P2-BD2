@@ -23,7 +23,7 @@ import json
 import numpy as np
 from heapq import heappush, heappop
 
-from config import (
+from audio.config import (
     INDEX_INV_DIR,
     K_CODEBOOK
 )

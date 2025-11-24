@@ -10,7 +10,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(SCRIPT_DIR)
 sys.path.append(PROJECT_DIR)
 
-from config import (
+from audio.config import (
     AUDIO_DIR,
     MFCC_DIR,
     SAMPLE_RATE,

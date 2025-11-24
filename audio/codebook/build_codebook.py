@@ -8,8 +8,7 @@ import warnings
 
 warnings.simplefilter("ignore", ConvergenceWarning)
 
-from config import MFCC_DIR, CODEBOOK_DIR, K_CODEBOOK
-
+from audio.config import MFCC_DIR, CODEBOOK_DIR, K_CODEBOOK
 
 # ============================================================
 # LOGGING

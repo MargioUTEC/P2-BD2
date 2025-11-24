@@ -16,9 +16,9 @@ import os
 from typing import List, Tuple
 import numpy as np
 
-from config import HIST_DIR
-from index.inverted.search_inverted import InvertedIndexSearch
-from index.sequential.knn_sequential import KNNSequential
+from audio.config import HIST_DIR
+from audio.index.inverted.search_inverted import InvertedIndexSearch
+from audio.index.sequential.knn_sequential import KNNSequential
 
 
 # ============================================================

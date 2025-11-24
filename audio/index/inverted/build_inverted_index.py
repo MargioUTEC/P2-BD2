@@ -4,7 +4,7 @@ import json
 import numpy as np
 from tqdm import tqdm
 
-from config import (
+from audio.config import (
     HIST_DIR,
     INDEX_INV_DIR,
     K_CODEBOOK

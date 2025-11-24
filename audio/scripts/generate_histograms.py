@@ -5,7 +5,7 @@ from sklearn.preprocessing import normalize
 from sklearn.feature_extraction.text import TfidfTransformer
 import joblib
 
-from config import (
+from audio.config import (
     MFCC_DIR,
     HIST_DIR,
     CODEBOOK_DIR,

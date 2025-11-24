@@ -18,8 +18,8 @@ import numpy as np
 from typing import List, Dict, Tuple
 
 # Motores de búsqueda
-from index.sequential.knn_sequential import KNNSequential
-from index.inverted.search_inverted import InvertedIndexSearch
+from audio.index.sequential.knn_sequential import KNNSequential
+from audio.index.inverted.search_inverted import InvertedIndexSearch
 
 # Metadata
 from metadata.metadata_query import MetadataQuery

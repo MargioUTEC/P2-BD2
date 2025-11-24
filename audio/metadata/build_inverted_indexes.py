@@ -17,7 +17,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Any
 
-from config_metadata import (
+from audio.config_metadata import (
     METADATA_DIR,
     PARSED_METADATA_PATH,
 )
