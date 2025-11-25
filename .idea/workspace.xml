@@ -5,31 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="d62ca2d4-1370-4b58-a5dc-9b3c3be8f2d0" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/audio/metadata/build_metadata_sqlite.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/audio/metadata/metadata_sqlite.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/api/dependencies.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/dependencies.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/api/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/api/models/audio.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/models/audio.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/api/models/fusion.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/models/fusion.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/api/models/metadata.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/models/metadata.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/api/routers/audio.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/routers/audio.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/api/routers/fusion.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/routers/fusion.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/api/routers/metadata.py" beforeDir="false" afterPath="$PROJECT_DIR$/api/routers/metadata.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/codebook/build_codebook.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/codebook/build_codebook.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/config_metadata.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/config_metadata.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/controller/audio_search_controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/controller/audio_search_controller.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/fusion/audio_backends.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/fusion/audio_backends.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/fusion/audio_metadata_fusion.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/fusion/audio_metadata_fusion.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/index/inverted/build_inverted_index.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/index/inverted/build_inverted_index.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/index/inverted/search_inverted.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/index/inverted/search_inverted.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/index/sequential/knn_sequential.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/index/sequential/knn_sequential.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/metadata/build_inverted_indexes.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/metadata/build_inverted_indexes.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/metadata/metadata_query.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/metadata/metadata_query.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/metadata/parser_metadata.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/metadata/parser_metadata.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/scripts/extract_mfcc.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/scripts/extract_mfcc.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/scripts/generate_histograms.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/scripts/generate_histograms.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/audio/metadata/build_metadata_sqlite.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/metadata/build_metadata_sqlite.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/audio/metadata/metadata_sqlite.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/metadata/metadata_sqlite.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -160,7 +138,7 @@
       <workItem from="1763936061297" duration="3604000" />
       <workItem from="1763968012276" duration="11312000" />
       <workItem from="1764018234755" duration="5295000" />
-      <workItem from="1764023921078" duration="3005000" />
+      <workItem from="1764023921078" duration="5577000" />
     </task>
     <servers />
   </component>
