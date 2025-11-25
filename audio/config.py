@@ -14,7 +14,7 @@ from pathlib import Path
 # ============================================================
 # RUTA EXTERNA donde está el dataset FMA SMALL (mp3)
 # ============================================================
-AUDIO_DIR = Path(r"D:/fma_small")
+AUDIO_DIR = Path("/Users/margio/Downloads/fma_small") 
 
 # ============================================================
 # Estructura interna del proyecto (audio/)

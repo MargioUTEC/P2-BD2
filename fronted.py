@@ -1,7 +1,10 @@
 import sys
 import time
 from PyQt5 import QtWidgets, QtCore, QtGui
+from pathlib import Path
+import requests
 
+API_URL = "http://127.0.0.1:8000"
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -32,7 +35,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.txtQuery = QtWidgets.QPlainTextEdit()
         self.txtQuery.setFixedHeight(100)
         self.txtQuery.setPlaceholderText( #aqui puse la query de ejemplo del doc nomas xd
-            "Ejemplo de consulta (puedes cambiarlo):\n\n"
             "SELECT title, artist, lyric\n"
             "FROM Audio\n"
             "WHERE lyric @@ 'amor en tiempos de guerra'\n"
@@ -117,11 +119,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.txtSQLMultimedia.setReadOnly(True)
         self.txtSQLMultimedia.setFixedHeight(90)
         self.txtSQLMultimedia.setPlaceholderText(
-            "Ejemplo de query SQL para audio.\n"
-            "Se actualiza cuando elijas un archivo.\n\n"
             "SELECT id, title\n"
             "FROM Audio\n"
-            "WHERE audio_sim <-> 'ruta/a/tu/audio.wav'\n"
+            "WHERE audio_sim <-> 'ruta/a/tu/audio.extension'\n"
             "LIMIT 8;"
         )
         form.addRow("Consulta SQL (ejemplo):", self.txtSQLMultimedia)
@@ -138,7 +138,7 @@ class MainWindow(QtWidgets.QMainWindow):
         layout.addWidget(self.lblEstadoMultimedia)
 
         # ── GroupBox: Resultados multimedia ──
-        group_results = QtWidgets.QGroupBox("Resultados de audio similares")
+        group_results = QtWidgets.QGroupBox("RESULTADOS DE AUDIOS SIMILARES")
         vres = QtWidgets.QVBoxLayout(group_results)
 
         # ScrollArea con grid interno
@@ -156,10 +156,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         layout.addWidget(group_results)
 
-        # Agregar tab
         self.tabs.addTab(tab, "Audio")
 
-        # Conectar señales
         self.btnBuscarArchivo.clicked.connect(self.on_elegir_archivo)
         self.btnBuscarMultimedia.clicked.connect(self.on_buscar_multimedia)
 
@@ -217,11 +215,14 @@ class MainWindow(QtWidgets.QMainWindow):
         if archivo:
             self.txtRutaArchivo.setText(archivo)
 
+            track_id = self._extract_track_id(archivo)
+            top_k = self.spinTopKMultimedia.value()
+
             plantilla = (
                 "SELECT id, title\n"
                 "FROM Audio\n"
-                f"WHERE audio_sim <-> '{archivo}'\n"
-                f"LIMIT {self.spinTopKMultimedia.value()};"
+                f"WHERE audio_sim <-> '{track_id}'\n"
+                f"LIMIT {top_k};"
             )
             self.txtSQLMultimedia.setPlainText(plantilla)
 
@@ -232,25 +233,36 @@ class MainWindow(QtWidgets.QMainWindow):
         if not ruta:
             self.lblEstadoMultimedia.setText("Por favor, seleccione un archivo de audio.")
             return
+        
+        track_id = self._extract_track_id(ruta)
+        if not track_id:
+            self.lblEstadoMultimedia.setText("No se pudo extraer el track_id del archivo seleccionado.")
+            return
+
+        self.lblEstadoMultimedia.setText("Consultando API…")
 
         start = time.time()
-        time.sleep(0.2)  # simulado tiempo
+        try:
+            response = requests.get(
+                f"{API_URL}/audio/search/{track_id}",
+                params={"k": top_k},
+                timeout=30,
+            )
+            response.raise_for_status()
+            api_results = response.json()
 
-        # Resultados dummy 
-        results = []
-        for i in range(top_k):
-            results.append({
-                "id": i + 1,
-                "title": f"Audio similar {i + 1}",
-                "score": 1.0 - i * 0.07,
-            })
+            results = self._enrich_results(api_results)
+       
 
-        elapsed = time.time() - start
+            elapsed = time.time() - start
 
-        self.mostrar_resultados_multimedia(results)
-        self.lblEstadoMultimedia.setText(
-            f"Mostrando {len(results)} resultados en {elapsed:.3f} s (entrada: audio)."
-        )
+            self.mostrar_resultados_multimedia(results)
+            self.lblEstadoMultimedia.setText(
+                f"Mostrando {len(results)} resultados en {elapsed:.3f} s (consulta: track {track_id})."
+            )
+        except requests.RequestException as exc:
+            self.lblEstadoMultimedia.setText(f"Error consultando API: {exc}")
+
 
     def limpiar_grid_multimedia(self):
         # Eliminar widgets anteriores del grid
@@ -278,6 +290,7 @@ class MainWindow(QtWidgets.QMainWindow):
             title_label.setWordWrap(True)
             title_label.setStyleSheet("font-weight: bold;")
 
+            artist_label = QtWidgets.QLabel(f"Artista: {res.get('artist', 'N/A')}")
             tipo_label = QtWidgets.QLabel("Tipo: Audio")
             score_label = QtWidgets.QLabel(f"Score: {res['score']:.3f}")
 
@@ -288,10 +301,59 @@ class MainWindow(QtWidgets.QMainWindow):
 
             card_layout.addWidget(icon_label)
             card_layout.addWidget(title_label)
+            card_layout.addWidget(artist_label)
             card_layout.addWidget(tipo_label)
             card_layout.addWidget(score_label)
 
             self.gridMultimedia.addWidget(card, row, col)
+
+  # =====================
+    # Helpers backend audio
+    # =====================
+    def _extract_track_id(self, file_path: str) -> str:
+        """Obtiene el track_id desde el nombre del archivo."""
+        try:
+            return Path(file_path).stem
+        except Exception:
+            return ""
+
+    def _fetch_metadata(self, track_id: str):
+        """Obtiene metadata opcional para mostrar título/artista."""
+        try:
+            resp = requests.get(
+                f"{API_URL}/metadata/track/{track_id}", timeout=10
+            )
+            if resp.status_code == 200:
+                data = resp.json().get("data", {})
+                track = data.get("track", {})
+                artist = data.get("artist", {})
+                title = track.get("title") or f"Track {track_id}"
+                artist_name = artist.get("name") or "Artista desconocido"
+                return title, artist_name
+        except requests.RequestException:
+            pass
+        return None, None
+
+    def _enrich_results(self, api_results):
+        """Convierte la respuesta de la API en la estructura usada por la UI."""
+        enriched = []
+        for result in api_results:
+            track_id = str(result.get("track_id", ""))
+            score = float(result.get("score", 0.0))
+            title, artist = self._fetch_metadata(track_id)
+            if title is None:
+                title = f"Track {track_id}"
+            if artist is None:
+                artist = "Artista no disponible"
+
+            enriched.append({
+                "id": track_id,
+                "title": title,
+                "artist": artist,
+                "score": score,
+            })
+        return enriched
+
 
 
 if __name__ == "__main__":
