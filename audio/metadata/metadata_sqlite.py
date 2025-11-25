@@ -1,108 +1,113 @@
+# audio/metadata/metadata_sqlite.py
+
 import sqlite3
+import json
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
+
 from audio.config_metadata import METADATA_OUT_DIR
 
 DB_PATH = Path(METADATA_OUT_DIR) / "metadata.db"
 
 
 class MetadataSQLite:
-    def __init__(self):
-        # Permite uso desde workers de FastAPI
-        self.conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-        self.conn.row_factory = sqlite3.Row
-        print(f"[SQLITE] Conectado a {DB_PATH}")
+    """
+    Acceso a metadata usando SQLite.
 
-    # ============================================================
-    # FORMATEADOR → Compatible con AudioMetadataFusion
-    # ============================================================
-    def _normalize_row(self, row: sqlite3.Row) -> Dict[str, Any]:
-        """
-        Convierte la fila plana del JOIN en:
+    La tabla 'metadata' tiene columnas:
+      - track_id (TEXT, PK, sin ceros a la izquierda, ej. "34996")
+      - track, artist, album, genre, features (JSON en texto)
+
+    Todos los métodos devuelven dicts con la misma estructura
+    que tenías en parsed_metadata.json:
         {
-           "track": {...},
-           "artist": {...},
-           "album": {...}
+          "track": {...},
+          "artist": {...},
+          "album": {...},
+          "genre": {...},
+          "features": {...}
         }
+    """
+
+    def __init__(self) -> None:
+        self._db_path = DB_PATH
+        print(f"[SQLITE] Usando base de metadata en: {self._db_path}")
+
+    # ------------------------------
+    # utilidades internas
+    # ------------------------------
+    def _get_conn(self) -> sqlite3.Connection:
         """
-        row = dict(row)
+        Creamos una conexión nueva por llamada.
+        check_same_thread=False permite usarla desde hilos distintos.
+        """
+        conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        return conn
 
-        normalized = {
-            "track": {
-                "track_id": row.get("track_id"),
-                "title": row.get("title"),
-                "genre_top": row.get("genre_top"),
-                "date_released": row.get("date_released"),
-            },
-            "artist": {
-                "id": row.get("artist_id"),
-                "name": row.get("artist_name"),
-                "location": row.get("artist_location"),
-            },
-            "album": {
-                "id": row.get("album_id"),
-                "title": row.get("album_title"),
-                "type": row.get("album_type"),
-            }
+    @staticmethod
+    def _normalize_tid(track_id: str) -> str:
+        """
+        Normaliza el track_id:
+          "034996" -> "34996"
+          "34996"  -> "34996"
+        Si no se puede convertir a int, se deja igual.
+        """
+        try:
+            return str(int(track_id))
+        except ValueError:
+            return track_id
+
+    @staticmethod
+    def _row_to_record(row: sqlite3.Row) -> Dict[str, Any]:
+        """
+        Convierte una fila de la tabla metadata a un dict anidado.
+        """
+        def decode(col: str) -> Dict[str, Any]:
+            txt = row[col]
+            if txt is None or txt == "":
+                return {}
+            try:
+                return json.loads(txt)
+            except json.JSONDecodeError:
+                return {}
+
+        return {
+            "track": decode("track"),
+            "artist": decode("artist"),
+            "album": decode("album"),
+            "genre": decode("genre"),
+            "features": decode("features"),
         }
 
-        return normalized
-
-    # ============================================================
-    # CONSULTAS
-    # ============================================================
-
-    def get_track(self, track_id: str) -> Optional[Dict[str, Any]]:
-        """Devuelve la fila cruda."""
-        cur = self.conn.execute("""
-            SELECT * FROM tracks WHERE track_id = ?
-        """, (track_id,))
-        r = cur.fetchone()
-        return dict(r) if r else None
-
-    def get_by_track_id(self, track_id: str) -> Optional[Dict[str, Any]]:
-        """JOIN completo normalizado."""
-        cur = self.conn.execute("""
-            SELECT 
-                t.track_id, t.title, t.genre_top, t.date_released,
-                a.id AS artist_id, a.name AS artist_name, a.location AS artist_location,
-                al.id AS album_id, al.title AS album_title, al.type AS album_type
-            FROM tracks t
-            LEFT JOIN artists a ON t.artist_id = a.id
-            LEFT JOIN albums al ON t.album_id = al.id
-            WHERE t.track_id = ?
-        """, (track_id,))
-
-        row = cur.fetchone()
-        if not row:
-            return None
-        return self._normalize_row(row)
-
-    def get_by_artist(self, artist_id: str) -> List[Dict[str, Any]]:
-        cur = self.conn.execute("""
-            SELECT * FROM tracks WHERE artist_id = ?
-        """, (artist_id,))
-        return [dict(r) for r in cur.fetchall()]
-
-    def get_by_genre(self, genre: str) -> List[Dict[str, Any]]:
-        cur = self.conn.execute("""
-            SELECT * FROM tracks WHERE genre_top = ?
-        """, (genre,))
-        return [dict(r) for r in cur.fetchall()]
-
-    def get_by_year(self, year: int) -> List[Dict[str, Any]]:
-        year = str(year)
-        cur = self.conn.execute("""
-            SELECT * FROM tracks 
-            WHERE substr(date_released, 1, 4) = ?
-        """, (year,))
-        return [dict(r) for r in cur.fetchall()]
-
-    # ============================================================
-    # INTERFAZ LEGACY → /metadata/track/{id}
-    # ============================================================
+    # ------------------------------
+    # API pública
+    # ------------------------------
     def get_metadata(self, track_id: str) -> Optional[Dict[str, Any]]:
         """
-        Compatible con la API antigua.
+        Devuelve la metadata COMPLETA para un track_id dado,
+        o None si no existe.
         """
-        return self.get_by_track_id(track_id)
+        norm_tid = self._normalize_tid(track_id)
+
+        with self._get_conn() as conn:
+            cur = conn.execute(
+                """
+                SELECT track, artist, album, genre, features
+                FROM metadata
+                WHERE track_id = ?
+                """,
+                (norm_tid,),
+            )
+            row = cur.fetchone()
+
+        if row is None:
+            return None
+
+        return self._row_to_record(row)
+
+    def get_by_track_id(self, track_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Alias más semántico para usar desde el fusionador.
+        """
+        return self.get_metadata(track_id)

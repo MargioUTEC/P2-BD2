@@ -1,91 +1,94 @@
+# audio/fusion/audio_metadata_fusion.py
+
 """
 audio_metadata_fusion.py
 ------------------------
-Módulo que combina resultados de audio (índice invertido o KNN)
-con metadata tabular para generar recomendaciones enriquecidas.
+Fusión de resultados de audio (índice invertido) con metadata
+guardada en SQLite.
 
-El parámetro alpha controla la mezcla:
-    score_final = alpha * score_audio + (1 - alpha) * score_metadata
+score_final = alpha * score_audio + (1 - alpha) * score_metadata
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from audio.fusion.audio_backends import InvertedIndexAudioBackend
-from audio.metadata.metadata_query import MetadataQuery
+from audio.metadata.metadata_sqlite import MetadataSQLite
 
 
 class AudioMetadataFusion:
     """
     Encapsula la lógica de fusión entre:
-        - Búsqueda acústica (InvertedIndexAudioBackend)
-        - Metadata tabular estructurada (MetadataQuery)
+      - backend acústico (InvertedIndexAudioBackend)
+      - metadata (MetadataSQLite)
     """
 
     def __init__(
         self,
         audio_backend: InvertedIndexAudioBackend,
-        metadata_query: MetadataQuery,
-        alpha: float = 0.7,  # peso del score de audio
-    ):
+        metadata_db: MetadataSQLite,
+        alpha: float = 0.7,
+    ) -> None:
         self.audio_backend = audio_backend
-        self.metadata_query = metadata_query
-        self.alpha = alpha  # mezcla entre audio y metadata
+        self.metadata_db = metadata_db
+        self.alpha = alpha
 
-    # ============================================================
-    # MÉTRICA SIMPLE PARA METADATA (puedes mejorarla después)
-    # ============================================================
+    # ============================
+    # MÉTRICA PARA METADATA
+    # ============================
+    @staticmethod
     def _metadata_score(
-        self,
-        candidate_md: Dict[str, Any] | None,
-        reference_md: Dict[str, Any] | None,
+        candidate_md: Dict[str, Any],
+        reference_md: Dict[str, Any],
     ) -> float:
         """
-        Calcula similitud de metadata entre un resultado y la metadata del query.
-        Versión mínima:
-            +1 si coinciden el género principal
-            +1 si coincide el año (por fecha de release)
+        Versión simple:
+          +1 si coincide genre_top
+          +1 si coincide año de release (4 dígitos)
         """
-        if not candidate_md or not reference_md:
-            return 0.0
 
         score = 0.0
 
-        # --- Género principal ---
+        # Género
         genre_q = reference_md.get("track", {}).get("genre_top")
         genre_r = candidate_md.get("track", {}).get("genre_top")
-
-        if genre_q is not None and genre_r is not None and genre_q == genre_r:
+        if genre_q and genre_r and genre_q == genre_r:
             score += 1.0
 
-        # --- Año (comparando las 4 primeras cifras de date_released) ---
-        year_q = reference_md.get("track", {}).get("date_released")
-        year_r = candidate_md.get("track", {}).get("date_released")
+        # Año (priorizamos album.date_released; si no, track.date_released)
+        def _year(md: Dict[str, Any]) -> Optional[str]:
+            album_date = md.get("album", {}).get("date_released")
+            track_date = md.get("track", {}).get("date_released")
+            val = album_date or track_date
+            if isinstance(val, str) and len(val) >= 4:
+                return val[:4]
+            return None
 
-        if isinstance(year_q, str) and isinstance(year_r, str):
-            if year_q[:4] == year_r[:4]:
-                score += 1.0
+        year_q = _year(reference_md)
+        year_r = _year(candidate_md)
+
+        if year_q and year_r and year_q == year_r:
+            score += 1.0
 
         return score
 
-    # ============================================================
-    # FUSIÓN AUDIO + METADATA PARA UN QUERY EXISTENTE
-    # ============================================================
+    # ============================
+    # FUSIÓN
+    # ============================
     def search_by_track(
         self,
         query_track_id: str,
         top_k: int = 10,
     ) -> List[Dict[str, Any]]:
         """
-        Dado un track_id de consulta:
-          1. Busca vecinos por audio (índice invertido).
-          2. Recupera metadata del query usando normalización de IDs.
-          3. Para cada vecino:
-             - Recupera metadata normalizada
-             - Calcula score de metadata simple
-             - Fusiona: score_final = alpha*audio + (1-alpha)*metadata
+        Devuelve una lista de dicts con:
+          - track_id
+          - score (final)
+          - score_audio
+          - score_metadata
+          - title, artist, genre, year
         """
 
-        # 1. Buscar en audio
+        # 1) búsqueda acústica
         audio_results = self.audio_backend.search_similar(
             query_track_id, top_k=top_k
         )
@@ -93,30 +96,44 @@ class AudioMetadataFusion:
         if not audio_results:
             return []
 
-        # 2. Metadata del query (usa normalización interna)
-        reference_md = self.metadata_query.get_by_track_id(query_track_id)
+        # 2) metadata de referencia (el track de la query)
+        reference_md = self.metadata_db.get_by_track_id(query_track_id)
 
-        # Si NO hay metadata, seguimos solo con audio (score_metadata = 0)
         if reference_md is None:
+            # No hay metadata para la query -> usamos solo audio
             print(
-                f"[WARN] Metadata para query_track_id={query_track_id} "
-                f"no encontrada. Se usará solo score de audio."
+                f"[WARN] Metadata para query_track_id={query_track_id} no encontrada. "
+                f"Se usará solo score de audio."
             )
 
         enriched: List[Dict[str, Any]] = []
 
-        # 3. Integrar metadata en resultados
+        # 3) enriquecemos cada vecino
         for tid, audio_score in audio_results:
             tid_str = str(tid)
 
-            # Metadata del vecino, usando normalización
-            candidate_md = self.metadata_query.get_by_track_id(tid_str)
+            candidate_md = self.metadata_db.get_by_track_id(tid_str)
 
-            # score basado en metadata
-            md_score = self._metadata_score(candidate_md, reference_md)
+            if candidate_md is not None and reference_md is not None:
+                md_score = self._metadata_score(candidate_md, reference_md)
+                title = candidate_md.get("track", {}).get("title")
+                artist = candidate_md.get("artist", {}).get("name")
+                genre = candidate_md.get("track", {}).get("genre_top")
+                year = (
+                    candidate_md.get("album", {}).get("date_released")
+                    or candidate_md.get("track", {}).get("date_released")
+                )
+            else:
+                md_score = 0.0
+                title = None
+                artist = None
+                genre = None
+                year = None
 
-            # fusión ponderada
-            final_score = self.alpha * float(audio_score) + (1.0 - self.alpha) * md_score
+            final_score = (
+                self.alpha * float(audio_score)
+                + (1.0 - self.alpha) * float(md_score)
+            )
 
             enriched.append(
                 {
@@ -124,22 +141,12 @@ class AudioMetadataFusion:
                     "score": float(final_score),
                     "score_audio": float(audio_score),
                     "score_metadata": float(md_score),
-                    "title": (
-                        candidate_md or {}
-                    ).get("track", {}).get("title"),
-                    "artist": (
-                        candidate_md or {}
-                    ).get("artist", {}).get("name"),
-                    "genre": (
-                        candidate_md or {}
-                    ).get("track", {}).get("genre_top"),
-                    "year": (
-                        candidate_md or {}
-                    ).get("track", {}).get("date_released"),
+                    "title": title,
+                    "artist": artist,
+                    "genre": genre,
+                    "year": year,
                 }
             )
 
-        # 4. Ordenar por score final
         enriched.sort(key=lambda x: x["score"], reverse=True)
-
         return enriched[:top_k]

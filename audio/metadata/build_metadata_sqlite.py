@@ -1,3 +1,5 @@
+# audio/metadata/build_metadata_sqlite.py
+
 import os
 import json
 import sqlite3
@@ -8,28 +10,34 @@ from audio.config_metadata import PARSED_METADATA_PATH, METADATA_OUT_DIR
 DB_PATH = Path(METADATA_OUT_DIR) / "metadata.db"
 
 
-def create_tables(conn):
+def create_tables(conn: sqlite3.Connection) -> None:
     c = conn.cursor()
 
-    # Tabla principal donde guardaremos TODO como JSON
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS metadata (
-            track_id TEXT PRIMARY KEY,
-            track_json TEXT,
-            artist_json TEXT,
-            album_json TEXT,
-            genre_json TEXT,
-            features_json TEXT
-        );
-    """)
+    # 🔥 IMPORTANTE: tirar la tabla vieja si existe, para evitar esquemas antiguos
+    c.execute("DROP TABLE IF EXISTS metadata;")
 
-    # Índices útiles
-    c.execute("CREATE INDEX IF NOT EXISTS idx_metadata_trackid ON metadata(track_id);")
+    c.execute(
+        """
+        CREATE TABLE metadata (
+            track_id TEXT PRIMARY KEY,
+            track    TEXT,
+            artist   TEXT,
+            album    TEXT,
+            genre    TEXT,
+            features TEXT
+        );
+        """
+    )
+
+    # índice por track_id (extra, la PK ya indexa, pero no molesta)
+    c.execute(
+        "CREATE INDEX IF NOT EXISTS idx_metadata_track_id ON metadata(track_id);"
+    )
 
     conn.commit()
 
 
-def load_json():
+def load_json() -> dict:
     if not PARSED_METADATA_PATH.exists():
         raise FileNotFoundError(f"No existe {PARSED_METADATA_PATH}")
 
@@ -37,55 +45,52 @@ def load_json():
         return json.load(f)
 
 
-def insert_data(conn, data):
+def insert_data(conn: sqlite3.Connection, data: dict) -> None:
     c = conn.cursor()
 
-    total = len(data)
-    print(f"[SQLITE] Insertando {total} tracks…")
+    print(f"[SQLITE] Insertando {len(data)} tracks…")
 
-    count = 0
+    rows = []
+    for raw_tid, record in data.items():
+        # normalizamos el track_id: "034996" -> "34996"
+        try:
+            norm_tid = str(int(raw_tid))
+        except ValueError:
+            norm_tid = raw_tid
 
-    for track_id, record in data.items():
+        track = json.dumps(record.get("track", {}), ensure_ascii=False)
+        artist = json.dumps(record.get("artist", {}), ensure_ascii=False)
+        album = json.dumps(record.get("album", {}), ensure_ascii=False)
+        genre = json.dumps(record.get("genre", {}), ensure_ascii=False)
+        features = json.dumps(record.get("features", {}), ensure_ascii=False)
 
-        c.execute("""
-            INSERT OR REPLACE INTO metadata (
-                track_id, track_json, artist_json, album_json, genre_json, features_json
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            track_id,
-            json.dumps(record.get("track", {})),
-            json.dumps(record.get("artist", {})),
-            json.dumps(record.get("album", {})),
-            json.dumps(record.get("genre", {})),
-            json.dumps(record.get("features", {})),
-        ))
+        rows.append((norm_tid, track, artist, album, genre, features))
 
-        count += 1
-        if count % 5000 == 0:
-            print(f"  → {count}/{total} insertados…")
-            conn.commit()
+    c.executemany(
+        """
+        INSERT INTO metadata (
+            track_id, track, artist, album, genre, features
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        rows,
+    )
 
     conn.commit()
     print("[OK] Inserción completa.")
 
 
-def build_sqlite():
+def build_sqlite() -> None:
     print("\n=== GENERANDO metadata.db ===")
 
-    # Crear carpeta si no existe
     os.makedirs(METADATA_OUT_DIR, exist_ok=True)
 
     conn = sqlite3.connect(DB_PATH)
-
     create_tables(conn)
 
     data = load_json()
-
     insert_data(conn, data)
 
     conn.close()
-
     print(f"[OK] Base SQLite generada en: {DB_PATH}")
 
 
