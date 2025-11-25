@@ -6,8 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="d62ca2d4-1370-4b58-a5dc-9b3c3be8f2d0" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/metadata/build_metadata_sqlite.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/metadata/build_metadata_sqlite.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/audio/metadata/metadata_sqlite.py" beforeDir="false" afterPath="$PROJECT_DIR$/audio/metadata/metadata_sqlite.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -138,7 +136,7 @@
       <workItem from="1763936061297" duration="3604000" />
       <workItem from="1763968012276" duration="11312000" />
       <workItem from="1764018234755" duration="5295000" />
-      <workItem from="1764023921078" duration="5577000" />
+      <workItem from="1764023921078" duration="7013000" />
     </task>
     <servers />
   </component>
