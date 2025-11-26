@@ -1,0 +1,119 @@
+<!-- frontend/templates/index.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <title>Proyecto 2 - Fusión texto / audio</title>
+    <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body>
+<div class="app-container">
+    <header class="app-header">
+        <h1>Proyecto 2 – Sistema de Búsqueda Multimedia</h1>
+        <p class="subtitle">Frontend web sobre FastAPI (fusión audio + metadata)</p>
+    </header>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab-button active" data-tab="audio-tab">Audio</button>
+        <button class="tab-button" data-tab="metadata-tab">Metadata</button>
+        <button class="tab-button" data-tab="text-tab">Texto</button>
+    </div>
+
+    <main class="tab-content-container">
+
+        <!-- TAB AUDIO -->
+        <section id="audio-tab" class="tab-content active">
+            <h2>Búsqueda por audio</h2>
+
+            <div class="card">
+                <div class="form-row">
+                    <label for="audio-file">Archivo de audio:</label>
+                    <input type="file" id="audio-file" accept=".wav,.mp3,.flac,.m4a" />
+                </div>
+
+                <div class="form-row">
+                    <label for="audio-topk">Top-K:</label>
+                    <input type="number" id="audio-topk" value="8" min="1" max="1000" />
+                </div>
+
+                <div class="form-row">
+                    <label>Consulta SQL (ejemplo):</label>
+                    <textarea id="audio-sql-example" rows="4" readonly></textarea>
+                </div>
+
+                <div class="form-row">
+                    <button id="audio-search-btn">Buscar similares</button>
+                </div>
+
+                <div id="audio-status" class="status-label">Listo.</div>
+            </div>
+
+            <!-- ========================================================= -->
+            <!-- 🔵 NUEVO: AUDIO ORIGINAL (RESPONSABLE DE TU ERROR)        -->
+            <!-- ========================================================= -->
+            <h3>Audio Original</h3>
+            <div id="audio-original" class="card" style="margin-bottom:20px;">
+                <!-- JS insertará el reproductor y metadata del track -->
+            </div>
+
+            <h3>Resultados</h3>
+            <div id="audio-results" class="card-grid">
+                <!-- Tarjetas de resultados se inyectan por JS -->
+            </div>
+        </section>
+
+        <!-- TAB METADATA -->
+        <section id="metadata-tab" class="tab-content">
+            <h2>Consulta de metadata por track_id</h2>
+
+            <div class="card">
+                <div class="form-row">
+                    <label for="meta-trackid">Track ID:</label>
+                    <input type="text" id="meta-trackid" placeholder="Ej: 034996" />
+                </div>
+                <div class="form-row">
+                    <button id="metadata-search-btn">Buscar metadata</button>
+                </div>
+                <div id="metadata-status" class="status-label">Listo.</div>
+            </div>
+
+            <h3>Resultado</h3>
+            <div id="metadata-result" class="card metadata-card">
+                <!-- Metadata formateada se inyecta aquí -->
+            </div>
+        </section>
+
+        <!-- TAB TEXTO -->
+        <section id="text-tab" class="tab-content">
+            <h2>Búsqueda por Texto</h2>
+
+            <div class="card">
+                <div class="form-row">
+                    <label for="text-query">Consulta textual:</label>
+                    <input type="text" id="text-query" placeholder="love forever dancing" />
+                </div>
+
+                <div class="form-row">
+                    <label for="text-topk">Top-K:</label>
+                    <input type="number" id="text-topk" value="5" min="1" max="100" />
+                </div>
+
+                <div class="form-row">
+                    <button id="text-search-btn">Buscar texto</button>
+                </div>
+
+                <div id="text-status" class="status-label">Listo.</div>
+            </div>
+
+            <h3>Resultados</h3>
+            <div id="text-results" class="card-grid"></div>
+        </section>
+
+    </main>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script src="/static/js/text.js"></script>
+</body>
+</html>

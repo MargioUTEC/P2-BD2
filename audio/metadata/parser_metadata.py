@@ -1,36 +1,23 @@
 """
-parser_metadata.py (VERSIÓN DEFINITIVA – MODELO C)
---------------------------------------------------
+parser_metadata.py (VERSIÓN FINAL – COMPLETA Y BLINDADA)
+--------------------------------------------------------
 
-Reconstruye correctamente la metadata del dataset FMA
+Reconstruye correctamente toda la metadata del dataset FMA
 a partir de tracks.csv, features.csv, echonest.csv y genres.csv.
 
-SALIDA:
-parsed_metadata.json organizado así:
-
-{
-  "track_id": {
-     "track": { ... },
-     "artist": { ... },
-     "album":  { ... },
-     "genre":  { ... },
-     "features": { ... },
-     "echonest": { ... }
-  },
-  ...
-}
-
-FUNCIONALIDADES:
-- Detecta headers multinivel reales
-- Aplana MultiIndex: (nivel1, nivel2) → dict anidado
-- Elimina columnas "Unnamed"
-- Convierte listas/dicts representados como strings
-- Convierte NaN → None
+Características clave:
+- track_id SIEMPRE normalizado a 6 dígitos (ej: 000002, 034996, 122911).
+- Limpieza de headers multinivel.
+- Alineación por posición para features.csv y echonest.csv (NO contienen track_id).
+- Reparación completa de genres.csv (que viene corrupto).
+- Inserción recursiva de estructuras anidadas.
+- Conversión segura a JSON.
+- Compatible con FastAPI para /metadata/track/<id>.
 """
 
 import os
-import json
 import ast
+import json
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -41,82 +28,117 @@ from audio.config_metadata import (
 )
 
 # ============================================================
-# Helpers
+# NORMALIZACIÓN GLOBAL DEL TRACK ID (siempre 6 dígitos)
 # ============================================================
+
+def normalize_tid(tid):
+    tid = str(tid).strip()
+    try:
+        return f"{int(tid):06d}"
+    except:
+        return tid.zfill(6)
+
+
+# ============================================================
+# HELPERS
+# ============================================================
+
 def clean_for_json(obj):
-    """Convierte valores no serializables (como ellipsis) a None."""
+    if obj is None or obj is ...:
+        return None
+    if obj is pd.NA:
+        return None
+    if isinstance(obj, float) and np.isnan(obj):
+        return None
+
     if isinstance(obj, dict):
         return {k: clean_for_json(v) for k, v in obj.items()}
+
     if isinstance(obj, list):
         return [clean_for_json(v) for v in obj]
-    if obj is ...:      # <-- esta línea mata el error
-        return None
+
     return obj
 
-def _load_csv_multi(path: Path) -> pd.DataFrame:
-    """Carga CSV con headers multinivel."""
-    df = pd.read_csv(path, header=[0, 1, 2], low_memory=False)
+
+def load_multilevel_csv(path: Path):
+    """Carga MultiIndex CSV del FMA con dtype=str."""
+    df = pd.read_csv(path, header=[0, 1, 2], dtype=str, low_memory=False)
     df = df.replace({np.nan: None})
     return df
 
 
-def _clean_header(col_tuple):
-    """
-    Toma un tuple de 3 niveles y elimina "Unnamed".
-    Ejemplo:
-        ("track", "genre_top", "") → ("track", "genre_top")
-    """
-    cleaned = [c for c in col_tuple if c and not str(c).startswith("Unnamed")]
+def clean_header(col_tuple):
+    cleaned = []
+    for c in col_tuple:
+        if c is None:
+            continue
+        s = str(c)
+        if s.lower().startswith("unnamed"):
+            continue
+        if s.strip() == "":
+            continue
+        cleaned.append(s)
     return tuple(cleaned)
 
 
-def _apply_string_eval(v):
-    """
-    Convierte strings tipo '[1,2]' o '{"a":1}' en objetos reales.
-    """
+def apply_string_eval(v):
     if isinstance(v, str):
-        v = v.strip()
-        if (v.startswith("{") and v.endswith("}")) or (v.startswith("[") and v.endswith("]")):
+        t = v.strip()
+        if (t.startswith("{") and t.endswith("}")) or (t.startswith("[") and t.endswith("]")):
             try:
-                return ast.literal_eval(v)
+                return ast.literal_eval(t)
             except:
                 return v
     return v
 
 
-def _recursive_insert(target_dict, key_tuple, value):
-    """
-    Inserta un valor en un dict anidado siguiendo el tuple:
-    ("track", "genre_top") → dict["track"]["genre_top"]
-    """
+def recursive_insert(target, key_tuple, value):
     if len(key_tuple) == 1:
-        target_dict[key_tuple[0]] = value
+        target[key_tuple[0]] = value
         return
 
-    head = key_tuple[0]
-    tail = key_tuple[1:]
+    head, tail = key_tuple[0], key_tuple[1:]
 
-    if head not in target_dict:
-        target_dict[head] = {}
+    if head not in target:
+        target[head] = {}
 
-    _recursive_insert(target_dict[head], tail, value)
+    recursive_insert(target[head], tail, value)
 
 
-def _df_to_nested_dict(df: pd.DataFrame) -> dict:
-    """
-    Convierte un dataframe con headers multinivel a dict anidado.
-    """
-    result = {}
-    for raw_col, value in df.items():
-
-        cleaned = _clean_header(raw_col)
-        if not cleaned:
+def row_to_nested(row: pd.Series):
+    nested = {}
+    for raw_col, value in row.items():
+        header = clean_header(raw_col)
+        if not header:
             continue
+        value = apply_string_eval(value)
+        recursive_insert(nested, header, value)
+    return nested
 
-        v = _apply_string_eval(value)
-        _recursive_insert(result, cleaned, v)
 
-    return result
+# ============================================================
+# CARGA REPARADA DE GENRES.CSV
+# ============================================================
+
+def load_genres_csv(path: Path) -> pd.DataFrame:
+    """
+    Corrige el MultiIndex corrupto de genres.csv.
+    Nivel 1 y 2 contienen basura → solo usamos nivel 0.
+    Consumimos filas 2+ como datos reales.
+    """
+    df_raw = pd.read_csv(path, header=[0, 1, 2], dtype=str, low_memory=False)
+
+    # Extraer SOLO el PRIMER nivel de cada columna
+    real_cols = [col[0] for col in df_raw.columns]
+
+    df = df_raw.copy()
+    df.columns = real_cols
+
+    # Remover primeras dos filas corruptas
+    df = df.iloc[2:].reset_index(drop=True)
+    df = df.replace({np.nan: None})
+
+    return df
 
 
 # ============================================================
@@ -124,45 +146,50 @@ def _df_to_nested_dict(df: pd.DataFrame) -> dict:
 # ============================================================
 
 def parse_fma_metadata():
-    print("\n=== PARSEANDO METADATA FMA (VERSIÓN C: JSON ANIDADO) ===")
+    print("\n=== PARSEANDO METADATA FMA — VERSIÓN FINAL ===")
 
-    metadata = {}
-    csv_files = {
-        "tracks": "tracks.csv",
-        "features": "features.csv",
-        "echonest": "echonest.csv",
-        "genres": "genres.csv"
+    # --------------------
+    # 1. Cargar CSVs
+    # --------------------
+    csv_paths = {
+        "tracks": Path(METADATA_DIR) / "tracks.csv",
+        "features": Path(METADATA_DIR) / "features.csv",
+        "echonest": Path(METADATA_DIR) / "echonest.csv",
+        "genres": Path(METADATA_DIR) / "genres.csv",
     }
 
-    loaded_tables = {}
+    loaded = {}
 
-    # --------------------------------------------------------
-    # 1. Cargar todos los CSV
-    # --------------------------------------------------------
-    for key, fname in csv_files.items():
-        path = Path(METADATA_DIR) / fname
-
+    for key, path in csv_paths.items():
         if not path.exists():
-            print(f"[WARN] No existe {fname}, se omite.")
+            print(f"[WARN] Falta archivo: {path.name}")
             continue
 
-        print(f"Cargando {fname} con header multinivel...")
-        df = _load_csv_multi(path)
-        df.index = df.index.astype(str)
-        loaded_tables[key] = df
+        print(f"Cargando {path.name}...")
+        if key == "genres":
+            loaded[key] = load_genres_csv(path)
+        else:
+            loaded[key] = load_multilevel_csv(path)
 
-    # --------------------------------------------------------
-    # 2. Procesar tracks primero (contiene artist/album/track)
-    # --------------------------------------------------------
+    if "tracks" not in loaded:
+        raise RuntimeError("ERROR: tracks.csv es obligatorio.")
+
+    tracks_df = loaded["tracks"]
+
+    # --------------------
+    # 2. Obtener track_ids REALES
+    # --------------------
     print("Procesando tracks.csv...")
 
-    tracks_df = loaded_tables.get("tracks")
-    if tracks_df is None:
-        raise RuntimeError("tracks.csv es obligatorio y no fue cargado")
+    tid_col = ('Unnamed: 0_level_0', 'Unnamed: 0_level_1', 'track_id')
 
-    # Crear estructura base por track_id
-    for tid, row in tracks_df.iterrows():
-        metadata[tid] = {
+    if tid_col not in tracks_df.columns:
+        raise RuntimeError("No se encuentra la columna real del track_id en tracks.csv")
+
+    tid_list = [normalize_tid(t) for t in tracks_df[tid_col].tolist()]
+
+    metadata = {
+        tid: {
             "track": {},
             "artist": {},
             "album": {},
@@ -170,89 +197,109 @@ def parse_fma_metadata():
             "features": {},
             "echonest": {}
         }
+        for tid in tid_list
+    }
 
-        # Convertir row → dict anidado
-        nested = _df_to_nested_dict(row)
-        # fusionar en metadata[tid]
-        for section in ["track", "artist", "album", "genre"]:
-            if section in nested:
-                metadata[tid][section].update(nested[section])
+    # Llenar track/artist/album
+    for i, row in tracks_df.iterrows():
+        tid = tid_list[i]
+        nested = row_to_nested(row)
 
-    # --------------------------------------------------------
-    # 3. Añadir features.csv
-    # --------------------------------------------------------
-    if "features" in loaded_tables:
+        for sec in ["track", "artist", "album"]:
+            if sec in nested:
+                metadata[tid][sec] = nested[sec]
+
+    # 3. features.csv (alineación POR TRACK_ID REAL)
+    # --------------------
+    if "features" in loaded:
         print("Procesando features.csv...")
-        df_feat = loaded_tables["features"]
 
-        for tid, row in df_feat.iterrows():
-            if tid not in metadata:
-                continue
-            nested = _df_to_nested_dict(row)
-            metadata[tid]["features"] = nested
+        df = loaded["features"]
 
-    # --------------------------------------------------------
-    # 4. Añadir echonest.csv
-    # --------------------------------------------------------
-    if "echonest" in loaded_tables:
+        # Ubicar columna donde vienen los track_id reales
+        tid_col = ('feature', 'statistics', 'number')
+
+        # Extraer lista de track_ids REALES (sin la fila basura)
+        real_features = df[tid_col].tolist()
+
+        # Detectar fila basura "track_id"
+        if real_features[0].lower() == "track_id":
+            df = df.iloc[1:].reset_index(drop=True)
+            real_features = real_features[1:]
+
+        # Normalizar track_id de features
+        real_features = [normalize_tid(t) for t in real_features]
+
+        # Crear mapa: track_id → fila
+        feature_map = {tid: df.iloc[i] for i, tid in enumerate(real_features) if tid in metadata}
+
+        # Insertar en metadata
+        for tid in metadata:
+            if tid in feature_map:
+                metadata[tid]["features"] = row_to_nested(feature_map[tid])
+
+    # --------------------
+    # 4. echonest.csv (alineación POR TRACK_ID REAL)
+    # --------------------
+    if "echonest" in loaded:
         print("Procesando echonest.csv...")
-        df_echo = loaded_tables["echonest"]
-        for tid, row in df_echo.iterrows():
-            if tid not in metadata:
-                continue
-            nested = _df_to_nested_dict(row)
-            metadata[tid]["echonest"] = nested
 
-    # --------------------------------------------------------
-    # 5. Añadir genres.csv (tabla simple)
-    # --------------------------------------------------------
-    if "genres" in loaded_tables:
-        print("Procesando genres.csv (corrigiendo header multinivel)...")
+        df = loaded["echonest"]
 
-        df_gen_raw = loaded_tables["genres"]
+        # track_id real está en la PRIMERA columna del MultiIndex
+        tid_col = df.columns[0]
 
-        # Aplanar columnas multinivel
-        flat_cols = []
-        for col in df_gen_raw.columns:
-            clean = []
-            for c in col:
-                if c is None:
-                    continue
-                if c is ...:  # <-- evitar ellipsis en headers
-                    continue
-                if str(c).startswith("Unnamed"):
-                    continue
-                if str(c).strip() == "":
-                    continue
-                clean.append(str(c))
-            flat_cols.append("_".join(clean) if clean else None)
+        # Extraer todos los valores
+        real_tids = df[tid_col].tolist()
 
-        df_gen_raw.columns = flat_cols
+        # Detectar y eliminar la fila basura 'track_id'
+        if isinstance(real_tids[0], str) and real_tids[0].lower() == "track_id":
+            df = df.iloc[1:].reset_index(drop=True)
+            real_tids = real_tids[1:]
 
-        # Buscar columna genre_id real
-        genre_id_col = None
-        for c in df_gen_raw.columns:
-            if c is None:
-                continue
-            if "genre_id" in c.lower():
-                genre_id_col = c
-                break
+        # Normalizar track_ids
+        real_tids = [normalize_tid(t) for t in real_tids]
 
-        if genre_id_col is None:
-            print("[WARN] No se encontró genre_id en genres.csv → Se omite asignación de géneros.")
-        else:
-            df_gen = df_gen_raw.rename(columns={genre_id_col: "genre_id"})
-            df_gen = df_gen.set_index("genre_id").replace({np.nan: None})
-            genre_dict = df_gen.to_dict(orient="index")
+        # Crear mapa: track_id → fila
+        echo_map = {
+            tid: df.iloc[i]
+            for i, tid in enumerate(real_tids)
+            if tid in metadata
+        }
 
-            for tid in metadata:
-                gtop = metadata[tid]["track"].get("genre_top")
-                if gtop and gtop in genre_dict:
-                    metadata[tid]["genre"] = genre_dict[gtop]
+        # Insertar en metadata
+        for tid in metadata:
+            if tid in echo_map:
+                metadata[tid]["echonest"] = row_to_nested(echo_map[tid])
 
-    # --------------------------------------------------------
+    # --------------------
+    # 5. genres.csv (mapeo por genre_top)
+    # --------------------
+    if "genres" in loaded:
+        print("Procesando genres.csv...")
+
+        genres_df = loaded["genres"]
+
+        # Buscar columna genre_id
+        genre_col = next((c for c in genres_df.columns if "genre_id" in str(c).lower()), None)
+        if genre_col is None:
+            raise RuntimeError("No se encontró genre_id en genres.csv")
+
+        genres_df = genres_df.rename(columns={genre_col: "genre_id"})
+        genres_df = genres_df.set_index("genre_id")
+        genres_df = genres_df.replace({np.nan: None})
+
+        genre_map = genres_df.to_dict(orient="index")
+
+        # Asignar a cada track
+        for tid in metadata:
+            gtop = metadata[tid]["track"].get("genre_top")
+            if gtop and gtop in genre_map:
+                metadata[tid]["genre"] = genre_map[gtop]
+
+    # --------------------
     # 6. Guardar JSON final
-    # --------------------------------------------------------
+    # --------------------
     Path(PARSED_METADATA_PATH).parent.mkdir(parents=True, exist_ok=True)
 
     with open(PARSED_METADATA_PATH, "w", encoding="utf-8") as f:
