@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: proyecto2_db
+    restart: always
+    environment:
+      POSTGRES_USER: dianananez
+      POSTGRES_PASSWORD: proyecto2bd
+      POSTGRES_DB: multimedia_db
+    ports:
+      - "5433:5432" 
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
