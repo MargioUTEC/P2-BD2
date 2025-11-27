@@ -5,14 +5,14 @@ import json
 import random
 import numpy as np
 
-from config import (
+from audio.config import (
     INDEX_INV_DIR,
     HIST_DIR,
     K_CODEBOOK
 )
 
 # Importa el módulo que vamos a probar
-from index.inverted.search_inverted import InvertedIndexSearch
+from audio.index.inverted.search_inverted import InvertedIndexSearch
 
 
 def main():

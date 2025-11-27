@@ -4,14 +4,14 @@ import os
 import random
 import numpy as np
 
-from config import (
+from audio.config import (
     MFCC_DIR,
     HIST_DIR,
     CODEBOOK_DIR,
     K_CODEBOOK
 )
 
-from scripts.generate_histograms import main as generate_histograms
+from audio.scripts.generate_histograms import main as generate_histograms
 
 
 def main():
@@ -52,6 +52,11 @@ def main():
 
     # 4) Verificar que se hayan generado archivos
     hist_files = [f for f in os.listdir(HIST_DIR) if f.endswith(".npy")]
+    # Validar que todos los histogramas tengan track_id de 6 dígitos
+    for fname in hist_files:
+        tid = fname.replace(".npy", "")
+        assert len(tid) == 6 and tid.isdigit(), \
+            f"track_id inválido: {tid}. Debe tener exactamente 6 dígitos."
 
     print(f"Histogramas generados: {len(hist_files)}")
 

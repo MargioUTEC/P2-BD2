@@ -5,8 +5,8 @@ import json
 import random
 import numpy as np
 
-from config import HIST_DIR, INDEX_INV_DIR, K_CODEBOOK
-from index.inverted.build_inverted_index import build_inverted_index
+from audio.config import HIST_DIR, INDEX_INV_DIR, K_CODEBOOK
+from audio.index.inverted.build_inverted_index import build_inverted_index
 
 
 def main():

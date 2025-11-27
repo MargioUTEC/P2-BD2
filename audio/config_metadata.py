@@ -7,10 +7,13 @@ Ahora compatible con SQLite.
 
 from pathlib import Path
 
-METADATA_DIR = Path("/Users/margio/Downloads/fma_metadata")
+
+#METADATA_DIR = Path("/Users/margio/Downloads/fma_metadata")
+METADATA_DIR = Path(r"D:\fma_metadata")
 
 # Carpeta raíz del proyecto (audio/)
-BASE_DIR = Path(__file__).resolve().parents[2]
+BASE_DIR = Path(__file__).resolve().parents[1]
+
 
 METADATA_STORE = BASE_DIR / "metadata_store"
 TABULAR_DIR = METADATA_STORE / "tabular"

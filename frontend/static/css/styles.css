@@ -1,0 +1,178 @@
+/* frontend/static/css/styles.css */
+
+body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0f172a;
+    color: #e5e7eb;
+}
+
+.app-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.app-header h1 {
+    margin: 0;
+    font-size: 1.8rem;
+    color: #f9fafb;
+}
+
+.subtitle {
+    margin-top: 4px;
+    color: #9ca3af;
+    font-size: 0.95rem;
+}
+
+.tabs {
+    margin-top: 20px;
+    display: flex;
+    gap: 8px;
+}
+
+.tab-button {
+    border: none;
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: #1f2937;
+    color: #e5e7eb;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
+.tab-button.active {
+    background: #3b82f6;
+    color: white;
+}
+
+.tab-content-container {
+    margin-top: 16px;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.card {
+    background: #111827;
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.45);
+    border: 1px solid #1f2937;
+    margin-bottom: 20px;
+}
+
+.form-row {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 12px;
+}
+
+.form-row label {
+    margin-bottom: 4px;
+    font-size: 0.9rem;
+    color: #d1d5db;
+}
+
+input[type="text"],
+input[type="number"],
+textarea {
+    background: #020617;
+    border-radius: 6px;
+    border: 1px solid #374151;
+    padding: 8px;
+    color: #e5e7eb;
+    font-size: 0.95rem;
+}
+
+input[type="file"] {
+    font-size: 0.9rem;
+}
+
+button {
+    background: #10b981;
+    border-radius: 999px;
+    border: none;
+    padding: 8px 16px;
+    color: white;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+button:hover {
+    background: #059669;
+}
+
+.status-label {
+    margin-top: 4px;
+    font-size: 0.85rem;
+    color: #9ca3af;
+}
+
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 12px;
+}
+
+.result-card {
+    background: #020617;
+    border-radius: 10px;
+    padding: 12px;
+    border: 1px solid #1f2937;
+}
+
+.result-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.result-title {
+    font-weight: 600;
+}
+
+.result-artist {
+    font-size: 0.9rem;
+    color: #9ca3af;
+}
+
+.result-badge {
+    font-size: 0.75rem;
+    background: #1f2937;
+    border-radius: 999px;
+    padding: 2px 8px;
+    color: #e5e7eb;
+}
+
+.result-score {
+    margin-top: 6px;
+    font-size: 0.85rem;
+    color: #a5b4fc;
+}
+
+.result-trackid {
+    margin-top: 6px;
+    font-size: 0.85rem;
+    color: #9ca3af;
+}
+
+.metadata-card {
+    min-height: 120px;
+}
+
+.metadata-row {
+    margin-bottom: 6px;
+    font-size: 0.95rem;
+}
+
+.metadata-label {
+    color: #9ca3af;
+    margin-right: 6px;
+}
