@@ -75,18 +75,36 @@ La ventana dedicada a audio replica esta estructura general, pero adaptada al do
 
 ## Análisis Comparativo
 
-### Texto
-| Tamaño de la colección (N) | MyIndex | PostgreSQL |
-|---------------------------|----------------|--------------|
-| N = 1000                  |                |              |
-| N = 2000                  |                |              |
-| N = 4000                  |                |              | 
-| N = 8000                  |                |              | 
-| N = 16000                 |                |              |
-| N = 32000                 |                |              |
-| N = 64000                 |                |              |
+## Experimento 1: Búsqueda en Texto (PostgreSQL vs. Implementación Propia)
 
+En esta sección se evalúa el rendimiento de la búsqueda full-text utilizando PostgreSQL como punto de referencia (baseline). Se compararon tiempos de respuesta variando el tamaño de la colección (N) desde 1,000 hasta 32,000 documentos.
 
+### Configuración del Experimento en PostgreSQL
+Para la indexación en base de datos, se investigaron y evaluaron dos tipos de índices nativos de PostgreSQL:
+* **GIN (Generalized Inverted Index):** Optimizado para lecturas rápidas y búsquedas de texto completo. Es ideal para datos estáticos donde la velocidad de consulta es crítica.
+* **GiST (Generalized Search Tree):** Optimizado para datos geométricos y búsquedas difusas, con inserciones más rápidas pero lecturas más lentas en comparación con GIN.
+
+**Decisión de Diseño:**
+Tras realizar pruebas preliminares, obtuvimos una diferencia significativa en tiempos de respuesta (lectura). Para N=32,000 registros:
+* **Índice GiST:** ~0.1471 segundos.
+* **Índice GIN:** ~0.0009 segundos.
+
+Dado que **GIN demostró ser aproximadamente 160 veces más rápido** en operaciones de recuperación para nuestro dataset de letras de canciones, seleccionamos este índice para la arquitectura final del proyecto.
+
+**Manejo de Consultas:**
+PostgreSQL gestiona las búsquedas convirtiendo el texto original en un `tsvector` (lista de lexemas normalizados, sin stopwords) y la consulta del usuario en un `tsquery`. La función de ranking utilizada internamente es `ts_rank`, que asigna un puntaje de relevancia basado en la frecuencia y densidad de los términos buscados.
+
+### Resultados de Rendimiento (Texto)
+
+| Tamaño de la colección (N) | MyIndex (Python) | PostgreSQL (GIN) |
+|---------------------------|------------------|------------------|
+| N = 2000                  | *pendiente* | **0.000686 s** |
+| N = 4000                  | *pendiente* | **0.000773 s** | 
+| N = 8000                  | *pendiente* | **0.000791 s** | 
+| N = 16000                 | *pendiente* | **0.000821 s** |
+| N = 32000                 | *pendiente* | **0.000917 s** |
+
+> **Análisis:** El índice GIN mantiene un tiempo de respuesta casi constante (sub-milisegundo) incluso al duplicar el volumen de datos, demostrando una escalabilidad logarítmica ideal para este tipo de aplicaciones.
 
 ### Audio
 | Tamaño de la colección (N) | KNN-Secuencial | KNN-Indexado | KNN-PostgreSQL |
