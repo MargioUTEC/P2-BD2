@@ -11,16 +11,38 @@
 ---
 
 ## Introducción
-aqui voy a escribir el dominio de datos (texto y audio) y del objetivo del proyecto.  
-Justificación de la necesidad de una base de datos multimodal orientada a recuperación por contenido.
+### Contexto del Proyecto
+Vivimos en una época donde la información crece exponencialmente, pero gran parte de ella es **"caos"**: datos no estructurados que no caben en las filas de una base de datos tradicional. Imágenes, audios, textos libres y videos componen la mayor parte del mundo digital. Entonces, ¿cómo podemos organizar, indexar y recuperar esta información de manera eficiente cuando los métodos clásicos (como SQL) ya no son suficientes?
 
+Para abordar este proyecto, nos hemos centrado en el **dominio musical**, un escenario ideal que combina dos mundos complejos: el lenguaje humano (las letras) y las señales acústicas (el sonido).
+
+### Dominio de Datos
+Nuestro sistema gestiona una Base de Datos Multimodal que integra:
+1.  **Texto (Semántica):** Procesamos las letras (*lyrics*) y metadatos de las canciones. Aquí el reto no es solo encontrar una palabra exacta, sino entender el contenido textual para realizar búsquedas relevantes por frases o temáticas.
+2.  **Audio (Contenido Acústico):** Analizamos la señal de audio pura. En lugar de buscar por el nombre del archivo, extraemos las "huellas digitales" sonoras (características acústicas) de cada canción para permitir búsquedas por similitud musical.
+
+### Justificación: ¿Por qué una Base de Datos Multimodal?
+Las bases de datos relacionales tradicionales son herramientas perfectas para búsquedas deterministas (ej. *"Dame la canción con ID 404"*). Sin embargo, fallan estrepitosamente ante consultas humanas y difusas, como *"búscame canciones que hablen de amor en tiempos de guerra"* o *"encuéntrame algo que suene parecido a esta pista"*.
+
+La necesidad de este proyecto radica en la implementación de técnicas de **Recuperación de Información (Information Retrieval)**. Al construir índices especializados (invertidos para texto y vectoriales para audio), logramos un sistema capaz de "entender" el contenido. Esto nos permite ofrecer una experiencia de búsqueda mucho más rica y natural, superando las limitaciones de la búsqueda simple por palabras clave o filtros exactos.
+
+---
+
+## Objetivos
+
+### Objetivo General
+Diseñar, construir y validar una **Base de Datos Multimodal** orientada a la recuperación eficiente de información por contenido. El sistema debe integrar algoritmos propios de indexación para texto y audio, permitiendo consultas rápidas y precisas sobre grandes volúmenes de datos.
+
+### Objetivos Específicos
+1.  **Implementar Indexación Textual Eficiente:** Desarrollar un índice invertido utilizando la técnica **SPIMI** (Single-Pass In-Memory Indexing) para procesar y organizar miles de documentos textuales sin saturar la memoria RAM, habilitando búsquedas de texto completo de alto rendimiento.
+2.  **Desarrollar Recuperación por Similitud de Audio:** Construir un "diccionario acústico" (mediante técnicas de **K-Means** y **Bag of Words**) que transforme señales de audio complejas en vectores (histogramas) comparables matemáticamente.
+3.  **Diseñar una Interfaz de Usuario (Frontend):** Crear una aplicación gráfica intuitiva que oculte la complejidad matemática al usuario, permitiéndole realizar consultas textuales y visuales (drag-and-drop) de forma sencilla.
+4.  **Evaluación Crítica de Desempeño:** Someter el sistema a pruebas de escalabilidad (hasta 64,000 registros) y comparar nuestros algoritmos frente a soluciones de industria como **PostgreSQL** (con índices GIN y HNSW), analizando objetivamente los tiempos de respuesta y la precisión de los resultados.
 
 ---
 
 ## Arquitectura del Proyecto
 (podemos poner un gráfico del procedimiento del proyecto)
-
-
 
 ---
 
