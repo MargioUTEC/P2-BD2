@@ -77,23 +77,22 @@ La ventana dedicada a audio replica esta estructura general, pero adaptada al do
 
 ## Experimento 1: Búsqueda en Texto (PostgreSQL vs. Implementación Propia)
 
-En esta sección se evalúa el rendimiento de la búsqueda full-text utilizando PostgreSQL como punto de referencia (baseline). Se compararon tiempos de respuesta variando el tamaño de la colección (N) desde 1,000 hasta 32,000 documentos.
+En esta parte quisimos ver qué tan rápido es nuestro buscador comparado con PostgreSQL. Hicimos varias pruebas aumentando la cantidad de canciones (N) poco a poco, desde 2,000 hasta 32,000, para ver si el sistema aguantaba.
 
-### Configuración del Experimento en PostgreSQL
-Para la indexación en base de datos, se investigaron y evaluaron dos tipos de índices nativos de PostgreSQL:
-* **GIN (Generalized Inverted Index):** Optimizado para lecturas rápidas y búsquedas de texto completo. Es ideal para datos estáticos donde la velocidad de consulta es crítica.
-* **GiST (Generalized Search Tree):** Optimizado para datos geométricos y búsquedas difusas, con inserciones más rápidas pero lecturas más lentas en comparación con GIN.
+### ¿Cómo configuramos PostgreSQL?
+Probamos con dos tipos de índices de Postgres para poder ver cuál funciona mejor para nuestro proyecto:
+* **GIN:** Es un índice especialista en texto. Es buenísimo para hacer búsquedas rápidas en datos que no cambian a cada rato (como las letras de canciones).
+* **GiST:** Es otro tipo de índice que sirve más para datos geométricos o búsquedas aproximadas. Es rápido para *guardar* datos nuevos, pero vimos que es más lento para *leerlos*.
 
-**Decisión de Diseño:**
-Tras realizar pruebas preliminares, obtuvimos una diferencia significativa en tiempos de respuesta (lectura). Para N=32,000 registros:
-* **Índice GiST:** ~0.1471 segundos.
-* **Índice GIN:** ~0.0009 segundos.
+**¿Por qué elegimos GIN?**
+Hicimos una "comparación" entre los dos con 32,000 canciones y la diferencia fue:
+* **Con GiST:** Tardaba unos ~0.1471 segundos.
+* **Con GIN:** Tardaba apenas ~0.0009 segundos.
 
-Dado que **GIN demostró ser aproximadamente 160 veces más rápido** en operaciones de recuperación para nuestro dataset de letras de canciones, seleccionamos este índice para la arquitectura final del proyecto.
+Básicamente, **GIN resultó ser 160 veces más rápido**. Como en este proyecto nos interesa que el usuario encuentre la canción al instante (y no vamos a estar cambiando las letras de las canciones a cada rato), decidimos quedarnos con GIN para la arquitectura final.
 
-**Manejo de Consultas:**
-PostgreSQL gestiona las búsquedas convirtiendo el texto original en un `tsvector` (lista de lexemas normalizados, sin stopwords) y la consulta del usuario en un `tsquery`. La función de ranking utilizada internamente es `ts_rank`, que asigna un puntaje de relevancia basado en la frecuencia y densidad de los términos buscados.
-
+**¿Cómo funciona la búsqueda por dentro?**
+PostgreSQL no busca letra por letra. Lo que hace es "limpiar" el texto de la canción (quita palabras de relleno, plurales, etc.) y lo convierte en algo llamado `tsvector`. Cuando el usuario busca algo, su consulta se transforma en `tsquery` y se compara con esos vectores. Para decidir qué canción sale primero en la lista, usa una función llamada `ts_rank`, que le da puntaje a los resultados dependiendo de qué tan frecuente aparece la palabra buscada en la canción.
 ### Resultados de Rendimiento (Texto)
 
 | Tamaño de la colección (N) | MyIndex (Python) | PostgreSQL (GIN) |
