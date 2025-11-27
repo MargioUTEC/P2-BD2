@@ -1,19 +1,11 @@
 from fastapi import APIRouter, HTTPException
-<<<<<<< HEAD
-=======
 from fastapi.responses import FileResponse
 from pathlib import Path
 
->>>>>>> f84e43eb0e438e1855f7aa7d373bd1f07924ecec
 from api.dependencies import audio_backend
 from api.models.audio import AudioSearchResult
-
 router = APIRouter()
 
-<<<<<<< HEAD
-@router.get("/search/{track_id}", response_model=list[AudioSearchResult])
-def search_audio(track_id: str, k: int = 5):
-=======
 # ============================================================
 # Ruta donde viven tus audios (ajusta si es diferente)
 # ============================================================
@@ -37,10 +29,6 @@ def search_audio(track_id: str, k: int = 5):
         ]
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
-<<<<<<< HEAD
-=======
-
-
 # ============================================================
 # 2) NUEVO: SERVIR ARCHIVOS DE AUDIO
 # ============================================================
@@ -61,4 +49,3 @@ def get_audio_file(track_id: str):
         return FileResponse(str(file_wav), media_type="audio/wav")
 
     raise HTTPException(status_code=404, detail=f"Audio para {tid} no encontrado.")
->>>>>>> f84e43eb0e438e1855f7aa7d373bd1f07924ecec
