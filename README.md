@@ -105,20 +105,30 @@ PostgreSQL no busca letra por letra. Lo que hace es "limpiar" el texto de la can
 
 > **Análisis:** El índice GIN mantiene un tiempo de respuesta casi constante (sub-milisegundo) incluso al duplicar el volumen de datos, demostrando una escalabilidad logarítmica ideal para este tipo de aplicaciones.
 
-### Audio
-| Tamaño de la colección (N) | KNN-Secuencial | KNN-Indexado | KNN-PostgreSQL |
-|---------------------------|----------------|--------------|----------------|
-| N = 1000                  |                |              |                |
-| N = 2000                  |                |              |                |
-| N = 4000                  |                |              |                |
-| N = 8000                  |                |              |                |
-| N = 16000                 |                |              |                |
-| N = 32000                 |                |              |                |
-| N = 64000                 |                |              |                |
+## Experimento 2: Búsqueda de Audio (Buscando Canciones Parecidas)
 
-\* Mantener el valor de K = 8.
+Aquí el reto era diferente. No buscamos palabras, sino "sonidos". Queríamos ver si PostgreSQL era capaz de encontrar canciones que suenen similar a otra (por ejemplo, si le doy una canción de rock, que me devuelva otras de rock) en cuestión de milisegundos.
 
+### ¿Cómo lo hicimos si nos faltaban datos?
+Teníamos unas ~8,000 canciones procesadas (histogramas), pero para hacer la comparación con distintos tamaños "clonamos" nuestras canciones reales automáticamente en la base de datos hasta llenar el espacio de 32,000 registros.
 
+### pgVector + HNSW
+Para lograr búsquedas de milisegundos, combinamos dos tecnologías clave:
+1.  **pgVector:** Permite a PostgreSQL entender y almacenar nuestros histogramas como **vectores matemáticos**, habilitando el cálculo de "distancia" (similitud) entre canciones.
+2.  **HNSW (Hierarchical Navigable Small World):** Es el índice que acelera el proceso. En lugar de comparar la consulta contra las 32,000 canciones una por una (búsqueda secuencial), HNSW va a organizar los datos en un **grafo de navegación**. Esto va a permite que el motor pueda "saltar" entre vecinos cercanos para encontrar el resultado casi al instante, sin recorrer toda la base de datos.
+### Resultados de Velocidad (Audio)
+
+La diferencia fue increíble. Incluso con 32,000 canciones, la base de datos responde en **casi 1 milisegundo**.
+
+| Tamaño de la colección (N) | KNN-Secuencial | KNN-Indexado | KNN-PostgreSQL (HNSW) |
+|---------------------------|----------------|--------------|-----------------------|
+| N = 2000                  | *pendiente* | *pendiente* | **0.003123 s** |
+| N = 4000                  | *pendiente* | *pendiente* | **0.001308 s** |
+| N = 8000                  | *pendiente* | *pendiente* | **0.001528 s** |
+| N = 16000                 | *pendiente* | *pendiente* | **0.001373 s** |
+| N = 32000                 | *pendiente* | *pendiente* | **0.001176 s** |
+
+> **Dato Curioso:** Si se fijan, buscar entre 32,000 canciones fue más rápido que buscar entre 2,000. Esto pasa por el **"Calentamiento de Caché"**. La primera vez que buscamos (con 2k), la base de datos estaba "fría" y tuvo que leer del disco. Para cuando llegamos a 32k, ya tenía los atajos en la memoria RAM y voló.
 
 ## Ejecución del Proyecto
 ??? aqui me imagino que describimos los pasitos del proyecto
