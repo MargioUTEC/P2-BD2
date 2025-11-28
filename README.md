@@ -94,6 +94,15 @@ El frontend fue desarrollado utilizando Qt para Python, priorizando la usabilida
 
 La ventana dedicada a audio replica esta estructura general, pero adaptada al dominio multimedia. El usuario puede cargar un archivo de consulta desde su sistema local y especificar los parámetros para la búsqueda por similitud. Una vez mostrados los resultados, la interfaz permite seleccionar cualquiera de los audios retornados y reproducirlo directamente, lo que facilita la validación subjetiva y objetiva de la similitud entre el archivo de consulta y los elementos recuperados. Esta organización del fronted habilita un flujo de interacción funcional con ambos sistemas de recuperación basados en contenido.
 
+### Ejecución del Frontend
+
+Para levantar la aplicación se deben iniciar primero los servicios de backend (APIs) y luego el servidor del frontend.  
+La ejecución recomendada es en el siguiente orden, desde la carpeta raíz del proyecto:
+
+- **API de audio**  
+  ```bash
+  python3 -m uvicorn api.main:app
+  ```
 
 ## Análisis Comparativo
 
