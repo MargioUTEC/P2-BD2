@@ -15,9 +15,9 @@
 
     <!-- Tabs -->
     <div class="tabs">
+        <button class="tab-button" data-tab="text-tab">Texto</button>
         <button class="tab-button active" data-tab="audio-tab">Audio</button>
         <button class="tab-button" data-tab="metadata-tab">Metadata</button>
-        <button class="tab-button" data-tab="text-tab">Texto</button>
     </div>
 
     <main class="tab-content-container">
@@ -59,12 +59,10 @@ WHERE genre = "Rock" AND year BETWEEN 2005 AND 2015;'
 
             <h3>Audio Original</h3>
             <div id="audio-original" class="card" style="margin-bottom:20px;">
-                <!-- JS insertará el reproductor y metadata del track -->
             </div>
 
             <h3>Resultados</h3>
             <div id="audio-results" class="card-grid">
-                <!-- Tarjetas de resultados se inyectan por JS -->
             </div>
         </section>
 
@@ -80,7 +78,7 @@ WHERE genre = "Rock" AND year BETWEEN 2005 AND 2015;'
                 <div class="form-row">
                     <button id="metadata-search-btn">Buscar metadata</button>
                 </div>
-                <div id="metadata-status" class="status-label">Listo.</div>
+                <div id="metadata-status" class="status-label">Listo</div>
             </div>
 
             <h3>Resultado</h3>

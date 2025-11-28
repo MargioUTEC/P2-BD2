@@ -11,16 +11,38 @@
 ---
 
 ## Introducción
-aqui voy a escribir el dominio de datos (texto y audio) y del objetivo del proyecto.  
-Justificación de la necesidad de una base de datos multimodal orientada a recuperación por contenido.
+### Contexto del Proyecto
+Vivimos en una época donde la información crece exponencialmente, pero gran parte de ella es **"caos"**: datos no estructurados que no caben en las filas de una base de datos tradicional. Imágenes, audios, textos libres y videos componen la mayor parte del mundo digital. Entonces, ¿cómo podemos organizar, indexar y recuperar esta información de manera eficiente cuando los métodos clásicos (como SQL) ya no son suficientes?
 
+Para abordar este proyecto, nos hemos centrado en el **dominio musical**, un escenario ideal que combina dos mundos complejos: el lenguaje humano (las letras) y las señales acústicas (el sonido).
+
+### Dominio de Datos
+Nuestro sistema gestiona una Base de Datos Multimodal que integra:
+1.  **Texto (Semántica):** Procesamos las letras (*lyrics*) y metadatos de las canciones. Aquí el reto no es solo encontrar una palabra exacta, sino entender el contenido textual para realizar búsquedas relevantes por frases o temáticas.
+2.  **Audio (Contenido Acústico):** Analizamos la señal de audio pura. En lugar de buscar por el nombre del archivo, extraemos las "huellas digitales" sonoras (características acústicas) de cada canción para permitir búsquedas por similitud musical.
+
+### Justificación: ¿Por qué una Base de Datos Multimodal?
+Las bases de datos relacionales tradicionales son herramientas perfectas para búsquedas deterministas (ej. *"Dame la canción con ID 404"*). Sin embargo, fallan estrepitosamente ante consultas humanas y difusas, como *"búscame canciones que hablen de amor en tiempos de guerra"* o *"encuéntrame algo que suene parecido a esta pista"*.
+
+La necesidad de este proyecto radica en la implementación de técnicas de **Recuperación de Información (Information Retrieval)**. Al construir índices especializados (invertidos para texto y vectoriales para audio), logramos un sistema capaz de "entender" el contenido. Esto nos permite ofrecer una experiencia de búsqueda mucho más rica y natural, superando las limitaciones de la búsqueda simple por palabras clave o filtros exactos.
+
+---
+
+## Objetivos
+
+### Objetivo General
+Diseñar, construir y validar una **Base de Datos Multimodal** orientada a la recuperación eficiente de información por contenido. El sistema debe integrar algoritmos propios de indexación para texto y audio, permitiendo consultas rápidas y precisas sobre grandes volúmenes de datos.
+
+### Objetivos Específicos
+1.  **Implementar Indexación Textual Eficiente:** Desarrollar un índice invertido utilizando la técnica **SPIMI** (Single-Pass In-Memory Indexing) para procesar y organizar miles de documentos textuales sin saturar la memoria RAM, habilitando búsquedas de texto completo de alto rendimiento.
+2.  **Desarrollar Recuperación por Similitud de Audio:** Construir un "diccionario acústico" (mediante técnicas de **K-Means** y **Bag of Words**) que transforme señales de audio complejas en vectores (histogramas) comparables matemáticamente.
+3.  **Diseñar una Interfaz de Usuario (Frontend):** Crear una aplicación gráfica intuitiva que oculte la complejidad matemática al usuario, permitiéndole realizar consultas textuales y visuales (drag-and-drop) de forma sencilla.
+4.  **Evaluación Crítica de Desempeño:** Someter el sistema a pruebas de escalabilidad (hasta 64,000 registros) y comparar nuestros algoritmos frente a soluciones de industria como **PostgreSQL** (con índices GIN y HNSW), analizando objetivamente los tiempos de respuesta y la precisión de los resultados.
 
 ---
 
 ## Arquitectura del Proyecto
 (podemos poner un gráfico del procedimiento del proyecto)
-
-
 
 ---
 
@@ -75,33 +97,60 @@ La ventana dedicada a audio replica esta estructura general, pero adaptada al do
 
 ## Análisis Comparativo
 
-### Texto
-| Tamaño de la colección (N) | MyIndex | PostgreSQL |
-|---------------------------|----------------|--------------|
-| N = 1000                  |                |              |
-| N = 2000                  |                |              |
-| N = 4000                  |                |              | 
-| N = 8000                  |                |              | 
-| N = 16000                 |                |              |
-| N = 32000                 |                |              |
-| N = 64000                 |                |              |
+## Experimento 1: Búsqueda en Texto (PostgreSQL vs. Implementación Propia)
 
+En esta parte quisimos ver qué tan rápido es nuestro buscador comparado con PostgreSQL. Hicimos varias pruebas aumentando la cantidad de canciones (N) poco a poco, desde 2,000 hasta 32,000, para ver si el sistema aguantaba.
 
+### ¿Cómo configuramos PostgreSQL?
+Probamos con dos tipos de índices de Postgres para poder ver cuál funciona mejor para nuestro proyecto:
+* **GIN:** Es un índice especialista en texto. Es buenísimo para hacer búsquedas rápidas en datos que no cambian a cada rato (como las letras de canciones).
+* **GiST:** Es otro tipo de índice que sirve más para datos geométricos o búsquedas aproximadas. Es rápido para *guardar* datos nuevos, pero vimos que es más lento para *leerlos*.
 
-### Audio
-| Tamaño de la colección (N) | KNN-Secuencial | KNN-Indexado | KNN-PostgreSQL |
-|---------------------------|----------------|--------------|----------------|
-| N = 1000                  |                |              |                |
-| N = 2000                  |                |              |                |
-| N = 4000                  |                |              |                |
-| N = 8000                  |                |              |                |
-| N = 16000                 |                |              |                |
-| N = 32000                 |                |              |                |
-| N = 64000                 |                |              |                |
+**¿Por qué elegimos GIN?**
+Hicimos una "comparación" entre los dos con 32,000 canciones y la diferencia fue:
+* **Con GiST:** Tardaba unos ~0.1471 segundos.
+* **Con GIN:** Tardaba apenas ~0.0009 segundos.
 
-\* Mantener el valor de K = 8.
+Básicamente, **GIN resultó ser 160 veces más rápido**. Como en este proyecto nos interesa que el usuario encuentre la canción al instante (y no vamos a estar cambiando las letras de las canciones a cada rato), decidimos quedarnos con GIN para la arquitectura final.
 
+**¿Cómo funciona la búsqueda por dentro?**
+PostgreSQL no busca letra por letra. Lo que hace es "limpiar" el texto de la canción (quita palabras de relleno, plurales, etc.) y lo convierte en algo llamado `tsvector`. Cuando el usuario busca algo, su consulta se transforma en `tsquery` y se compara con esos vectores. Para decidir qué canción sale primero en la lista, usa una función llamada `ts_rank`, que le da puntaje a los resultados dependiendo de qué tan frecuente aparece la palabra buscada en la canción.
+### Resultados de Rendimiento (Texto)
 
+| Tamaño de la colección (N) | MyIndex (Python) | PostgreSQL (GIN) |
+|---------------------------|------------------|------------------|
+| N = 2000                  | *pendiente* | **0.000686 s** |
+| N = 4000                  | *pendiente* | **0.000773 s** | 
+| N = 8000                  | *pendiente* | **0.000791 s** | 
+| N = 16000                 | *pendiente* | **0.000821 s** |
+| N = 32000                 | *pendiente* | **0.000917 s** |
+
+> **Análisis:** El índice GIN mantiene un tiempo de respuesta casi constante (sub-milisegundo) incluso al duplicar el volumen de datos, demostrando una escalabilidad logarítmica ideal para este tipo de aplicaciones.
+
+## Experimento 2: Búsqueda de Audio (Buscando Canciones Parecidas)
+
+Aquí el reto era diferente. No buscamos palabras, sino "sonidos". Queríamos ver si PostgreSQL era capaz de encontrar canciones que suenen similar a otra (por ejemplo, si le doy una canción de rock, que me devuelva otras de rock) en cuestión de milisegundos.
+
+### ¿Cómo lo hicimos si nos faltaban datos?
+Teníamos unas ~8,000 canciones procesadas (histogramas), pero para hacer la comparación con distintos tamaños "clonamos" nuestras canciones reales automáticamente en la base de datos hasta llenar el espacio de 32,000 registros.
+
+### pgVector + HNSW
+Para lograr búsquedas de milisegundos, combinamos dos tecnologías clave:
+1.  **pgVector:** Permite a PostgreSQL entender y almacenar nuestros histogramas como **vectores matemáticos**, habilitando el cálculo de "distancia" (similitud) entre canciones.
+2.  **HNSW (Hierarchical Navigable Small World):** Es el índice que acelera el proceso. En lugar de comparar la consulta contra las 32,000 canciones una por una (búsqueda secuencial), HNSW va a organizar los datos en un **grafo de navegación**. Esto va a permite que el motor pueda "saltar" entre vecinos cercanos para encontrar el resultado casi al instante, sin recorrer toda la base de datos.
+### Resultados de Velocidad (Audio)
+
+La diferencia fue increíble. Incluso con 32,000 canciones, la base de datos responde en **casi 1 milisegundo**.
+
+| Tamaño de la colección (N) | KNN-Secuencial | KNN-Indexado | KNN-PostgreSQL (HNSW) |
+|---------------------------|----------------|--------------|-----------------------|
+| N = 2000                  | *pendiente* | *pendiente* | **0.003123 s** |
+| N = 4000                  | *pendiente* | *pendiente* | **0.001308 s** |
+| N = 8000                  | *pendiente* | *pendiente* | **0.001528 s** |
+| N = 16000                 | *pendiente* | *pendiente* | **0.001373 s** |
+| N = 32000                 | *pendiente* | *pendiente* | **0.001176 s** |
+
+> **Dato Curioso:** Si se fijan, buscar entre 32,000 canciones fue más rápido que buscar entre 2,000. Esto pasa por el **"Calentamiento de Caché"**. La primera vez que buscamos (con 2k), la base de datos estaba "fría" y tuvo que leer del disco. Para cuando llegamos a 32k, ya tenía los atajos en la memoria RAM y voló.
 
 ## Ejecución del Proyecto
 ??? aqui me imagino que describimos los pasitos del proyecto

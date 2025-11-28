@@ -1,6 +1,9 @@
+# audio/fusion/audio_metadata_fusion.py
+
 """
 audio_metadata_fusion.py
 ------------------------
+
 Fusión entre:
  - backend de audio (InvertedIndexAudioBackend o similar)
  - metadata en SQLite (MetadataSQLite)
@@ -58,15 +61,24 @@ class AudioMetadataFusion:
 
         return score
 
+
     # ==========================
     # FUSIÓN
     # ==========================
-
     def search_by_track(
         self,
         query_track_id: str,
         top_k: int = 10,
     ) -> List[Dict[str, Any]]:
+        """
+        Devuelve una lista de dicts con:
+          - track_id
+          - score (final)
+          - score_audio
+          - score_metadata
+          - title, artist, genre, year
+        """
+
 
         # 1) Resultados de audio
         audio_results = self.audio_backend.search_similar(
@@ -75,6 +87,7 @@ class AudioMetadataFusion:
 
         if not audio_results:
             return []
+
 
         # 2) Metadata del track de consulta
         ref_md = self.metadata_db.get_by_track_id(query_track_id)
