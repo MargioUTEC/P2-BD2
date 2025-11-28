@@ -20,7 +20,6 @@ def search_audio(track_id: str, k: int = 5):
     """
     Devuelve top-k tracks más similares usando el backend de audio.
     """
->>>>>>> f84e43eb0e438e1855f7aa7d373bd1f07924ecec
     try:
         results = audio_backend.search_similar(track_id, top_k=k)
         return [

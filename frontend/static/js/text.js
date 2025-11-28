@@ -3,6 +3,7 @@
 // ======================================================
 
 const textQueryInput = document.getElementById("text-query");
+const textMetadataExample = document.getElementById("text-sql-example");
 const textKInput = document.getElementById("text-topk");
 const textSearchBtn = document.getElementById("text-search-btn");
 const textStatus = document.getElementById("text-status");
@@ -45,9 +46,28 @@ textSearchBtn.addEventListener("click", async () => {
     }
 });
 
-// ======================================================
-// Renderizar resultados de texto
-// ======================================================
+function updateTextSqlExample() {
+    const rawQuery = (textQueryInput.value || "").trim();
+    const k = parseInt(textKInput.value || "5", 10);
+
+    // Si está vacío, pon un ejemplo cualquiera:
+    const safeQuery = rawQuery
+        ? rawQuery.replace(/'/g, "''")
+        : "amor en tiempos de guerra";
+
+    const example =
+`SELECT title, artist, lyric
+FROM Audio
+WHERE lyric @@ '${safeQuery}'
+LIMIT ${k};`;
+
+    textMetadataExample.value = example;
+}
+
+textQueryInput.addEventListener("input", updateTextSqlExample);
+textKInput.addEventListener("input", updateTextSqlExample);
+
+updateTextSqlExample();
 
 async function renderTextResults(results) {
     textResultsDiv.innerHTML = "";

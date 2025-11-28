@@ -75,9 +75,6 @@ audioFileInput.addEventListener("change", () => {
     updateAudioSqlExample(tid, topK);
 });
 
-// ======================================================
-// Handler de búsqueda por audio
-// ======================================================
 
 audioSearchBtn.addEventListener("click", async () => {
     const file = audioFileInput.files[0];

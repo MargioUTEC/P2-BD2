@@ -15,9 +15,9 @@
 
     <!-- Tabs -->
     <div class="tabs">
+        <button class="tab-button" data-tab="text-tab">Texto</button>
         <button class="tab-button active" data-tab="audio-tab">Audio</button>
         <button class="tab-button" data-tab="metadata-tab">Metadata</button>
-        <button class="tab-button" data-tab="text-tab">Texto</button>
     </div>
 
     <main class="tab-content-container">
@@ -49,17 +49,12 @@
                 <div id="audio-status" class="status-label">Listo.</div>
             </div>
 
-            <!-- ========================================================= -->
-            <!-- 🔵 NUEVO: AUDIO ORIGINAL (RESPONSABLE DE TU ERROR)        -->
-            <!-- ========================================================= -->
             <h3>Audio Original</h3>
             <div id="audio-original" class="card" style="margin-bottom:20px;">
-                <!-- JS insertará el reproductor y metadata del track -->
             </div>
 
             <h3>Resultados</h3>
             <div id="audio-results" class="card-grid">
-                <!-- Tarjetas de resultados se inyectan por JS -->
             </div>
         </section>
 
@@ -75,7 +70,7 @@
                 <div class="form-row">
                     <button id="metadata-search-btn">Buscar metadata</button>
                 </div>
-                <div id="metadata-status" class="status-label">Listo.</div>
+                <div id="metadata-status" class="status-label">Listo</div>
             </div>
 
             <h3>Resultado</h3>
@@ -97,6 +92,11 @@
                 <div class="form-row">
                     <label for="text-topk">Top-K:</label>
                     <input type="number" id="text-topk" value="5" min="1" max="100" />
+                </div>
+
+                <div class="form-row">
+                    <label>Consulta SQL (ejemplo):</label>
+                    <textarea id="text-sql-example" rows="4" readonly></textarea>
                 </div>
 
                 <div class="form-row">
