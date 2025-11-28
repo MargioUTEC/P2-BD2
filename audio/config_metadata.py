@@ -8,8 +8,8 @@ Ahora compatible con SQLite.
 from pathlib import Path
 
 
-#METADATA_DIR = Path("/Users/margio/Downloads/fma_metadata")
-METADATA_DIR = Path(r"D:\fma_metadata")
+METADATA_DIR = Path("/Users/margio/Downloads/fma_metadata")
+#METADATA_DIR = Path(r"D:\fma_metadata")
 
 # Carpeta raíz del proyecto (audio/)
 BASE_DIR = Path(__file__).resolve().parents[1]

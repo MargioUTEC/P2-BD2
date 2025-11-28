@@ -113,6 +113,21 @@ La ejecución recomendada es en el siguiente orden, desde la carpeta raíz del p
   ```
 
 Una vez levantados los tres servicios, se puede acceder a la pantalla principal de la aplicación desde el navegador en http://127.0.0.1:8001.
+--
+
+## Pantallas de la aplicación
+
+### Pantalla de búsqueda por texto
+![Pantalla principal](images/pantalla-principal.png)
+
+![](images/pantalla-principal2.png)
+
+
+### Pantalla de búsqueda por audio
+![Sección audio](images/pantalla-audio.png)
+
+### Pantalla de metadata del track
+![Sección metadata](images/pantalla-metadata.png)
 
 ## Análisis Comparativo
 
