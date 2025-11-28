@@ -103,6 +103,16 @@ La ejecución recomendada es en el siguiente orden, desde la carpeta raíz del p
   ```bash
   python3 -m uvicorn api.main:app
   ```
+- **API de texto**
+  ```bash
+  python3 -m uvicorn api2.main2:app --port 8002
+  ```
+- **Fronted**
+  ```bash
+  python3 -m uvicorn frontend.web_frontend:app --port 8001
+  ```
+
+Una vez levantados los tres servicios, se puede acceder a la pantalla principal de la aplicación desde el navegador en http://127.0.0.1:8001.
 
 ## Análisis Comparativo
 
