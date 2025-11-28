@@ -38,8 +38,16 @@
                 </div>
 
                 <div class="form-row">
-                    <label>Consulta SQL (ejemplo):</label>
-                    <textarea id="audio-sql-example" rows="4" readonly></textarea>
+                    <label>Consulta SQL sobre metadata (opcional):</label>
+                    <textarea
+                        id="audio-sql-example"
+                        rows="4"
+                        placeholder='Ej:
+genre = "Electronic" AND year >= 2010
+-- o:
+SELECT track_id FROM metadata
+WHERE genre = "Rock" AND year BETWEEN 2005 AND 2015;'
+                    ></textarea>
                 </div>
 
                 <div class="form-row">
@@ -49,9 +57,6 @@
                 <div id="audio-status" class="status-label">Listo.</div>
             </div>
 
-            <!-- ========================================================= -->
-            <!-- 🔵 NUEVO: AUDIO ORIGINAL (RESPONSABLE DE TU ERROR)        -->
-            <!-- ========================================================= -->
             <h3>Audio Original</h3>
             <div id="audio-original" class="card" style="margin-bottom:20px;">
                 <!-- JS insertará el reproductor y metadata del track -->
@@ -82,29 +87,80 @@
             <div id="metadata-result" class="card metadata-card">
                 <!-- Metadata formateada se inyecta aquí -->
             </div>
+
+            <h2>Consulta SQL sobre metadata</h2>
+
+            <div class="card">
+                <div class="form-row">
+                    <label for="metadata-sql-input">Consulta SQL:</label>
+                    <textarea
+                        id="metadata-sql-input"
+                        rows="4"
+                        placeholder='Ej: SELECT track_id, title, artist FROM metadata WHERE genre = "Rock" AND year >= 2010;'
+                    ></textarea>
+                </div>
+                <div class="form-row">
+                    <button id="metadata-sql-btn">Ejecutar consulta</button>
+                </div>
+                <div id="metadata-sql-status" class="status-label">Listo.</div>
+            </div>
+
+            <h3>Resultados SQL</h3>
+            <div id="metadata-sql-results" class="card-grid">
+                <!-- Resultados de la consulta SQL se mostrarán aquí -->
+            </div>
         </section>
 
         <!-- TAB TEXTO -->
         <section id="text-tab" class="tab-content">
             <h2>Búsqueda por Texto</h2>
 
+            <!-- MODO SIMPLE -->
             <div class="card">
+                <h3>Búsqueda simple</h3>
+
                 <div class="form-row">
-                    <label for="text-query">Consulta textual:</label>
-                    <input type="text" id="text-query" placeholder="love forever dancing" />
+                    <label for="text-query">Texto a buscar:</label>
+                    <input
+                        type="text"
+                        id="text-query"
+                        placeholder='Ej: "amor en tiempos de guerra"'
+                    />
                 </div>
 
                 <div class="form-row">
                     <label for="text-topk">Top-K:</label>
-                    <input type="number" id="text-topk" value="5" min="1" max="100" />
+                    <input type="number" id="text-topk" value="10" min="1" max="1000" />
                 </div>
 
                 <div class="form-row">
-                    <button id="text-search-btn">Buscar texto</button>
+                    <button id="text-simple-btn">Buscar (simple)</button>
+                </div>
+            </div>
+
+            <!-- MODO SQL -->
+            <div class="card" style="margin-top:20px;">
+                <h3>Búsqueda avanzada (SQL)</h3>
+
+                <div class="form-row">
+                    <label for="text-sql-input">Consulta SQL sobre texto:</label>
+                    <textarea
+                        id="text-sql-input"
+                        rows="4"
+                        placeholder='Ej:
+SELECT title, artist, lyric
+FROM Audio
+WHERE lyric @@ ''amor en tiempos de guerra''
+LIMIT 10;'
+                    ></textarea>
                 </div>
 
-                <div id="text-status" class="status-label">Listo.</div>
+                <div class="form-row">
+                    <button id="text-search-btn">Buscar (SQL)</button>
+                </div>
             </div>
+
+            <div id="text-status" class="status-label" style="margin-top:10px;">Listo.</div>
 
             <h3>Resultados</h3>
             <div id="text-results" class="card-grid"></div>
@@ -113,7 +169,7 @@
     </main>
 </div>
 
-<script src="/static/js/app.js"></script>
-<script src="/static/js/text.js"></script>
+<script src="/static/js/app.js?v=1"></script>
+<script src="/static/js/text.js?v=5"></script>
 </body>
 </html>

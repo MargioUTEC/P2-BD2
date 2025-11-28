@@ -1,165 +1,179 @@
+# scripts/generate_histograms.py
+"""
+Generación de histogramas de codewords a partir de MFCC normalizados
+con estadísticas globales.
+
+Pipeline:
+  1. Cargar MFCC de MFCC_DIR (matrices (n_frames, n_mfcc)).
+  2. Normalizar cada matriz MFCC con las stats globales (mfcc_stats.npz).
+  3. Asignar cada frame al centroide más cercano del codebook (MiniBatchKMeans).
+  4. Construir un histograma de conteos por codeword de tamaño K_CODEBOOK.
+  5. Guardar el histograma en HIST_DIR con la misma estructura de subcarpetas.
+"""
+
 import os
 import numpy as np
 from tqdm import tqdm
-from sklearn.preprocessing import normalize
-from sklearn.feature_extraction.text import TfidfTransformer
 import joblib
 
 from audio.config import (
     MFCC_DIR,
     HIST_DIR,
     CODEBOOK_DIR,
-    K_CODEBOOK
+    K_CODEBOOK,
 )
 
 
-# ============================================================
-# CARGA DEL CODEBOOK
-# ============================================================
+STATS_PATH = os.path.join(CODEBOOK_DIR, "mfcc_stats.npz")
+CODEBOOK_PATH = os.path.join(CODEBOOK_DIR, "codebook_kmeans.joblib")
 
-def load_codebook():
-    """
-    Carga el modelo MiniBatchKMeans previamente entrenado.
-    """
-    model_path = os.path.join(CODEBOOK_DIR, "codebook_kmeans.pkl")
 
-    if not os.path.exists(model_path):
+def _iter_mfcc_paths():
+    """
+    Recorre MFCC_DIR recursivamente y devuelve rutas a archivos .npy de MFCC.
+    """
+    mfcc_paths = []
+    for root, _, files in os.walk(MFCC_DIR):
+        for fname in files:
+            if fname.lower().endswith(".npy"):
+                mfcc_paths.append(os.path.join(root, fname))
+    mfcc_paths.sort()
+    return mfcc_paths
+
+
+def _load_mfcc(path: str) -> np.ndarray:
+    """
+    Carga un archivo .npy de MFCC y valida su forma.
+    Esperamos una matriz 2D de shape (n_frames, n_mfcc).
+    """
+    mfcc = np.load(path)
+    if mfcc.ndim != 2:
+        raise ValueError(f"MFCC inválido en {path}, se esperaba matriz 2D, got {mfcc.shape}")
+    if mfcc.shape[0] == 0:
+        raise ValueError(f"MFCC vacío en {path}")
+    return mfcc.astype(np.float32)
+
+
+def _load_global_stats():
+    """
+    Carga media y desviación estándar globales de MFCC desde STATS_PATH.
+    Estas deben haberse guardado en build_codebook.py.
+    """
+    if not os.path.exists(STATS_PATH):
         raise FileNotFoundError(
-            f"No se encontró el codebook en {model_path}. "
-            "Ejecuta antes: build_codebook.py"
+            f"No se encontró {STATS_PATH}. "
+            f"Primero ejecuta build_codebook.py para generar las estadísticas globales."
         )
 
-    try:
-        kmeans = joblib.load(model_path)
-    except Exception as e:
-        raise RuntimeError(f"Error cargando codebook: {e}")
+    stats = np.load(STATS_PATH)
+    mean = stats["mean"].astype(np.float32)
+    std = stats["std"].astype(np.float32)
+    std[std == 0.0] = 1e-8
+    return mean, std
 
-    return kmeans
 
-
-# ============================================================
-# GENERACIÓN DE HISTOGRAMAS
-# ============================================================
-
-def compute_histogram(mfcc_vectors, kmeans):
+def normalize_mfcc(mfcc_matrix: np.ndarray, mean: np.ndarray, std: np.ndarray) -> np.ndarray:
     """
-    Asigna cada MFCC al codeword más cercano (nearest centroid)
-    y retorna un histograma de tamaño K_CODEBOOK.
-    """
-    if mfcc_vectors is None or mfcc_vectors.size == 0:
-        return np.zeros(K_CODEBOOK, dtype=np.float32)
+    Normaliza una matriz de MFCC (n_frames, n_mfcc) usando media y std globales.
 
-    # Asegurar shape correcto
-    if mfcc_vectors.ndim != 2:
+    mean y std son vectores de longitud n_mfcc.
+    """
+    if mfcc_matrix is None or mfcc_matrix.size == 0:
+        return mfcc_matrix
+    if mfcc_matrix.ndim != 2:
         raise ValueError(
-            f"MFCC inválido, se esperaba matriz 2D y se recibió shape {mfcc_vectors.shape}"
+            f"MFCC inválido, se esperaba matriz 2D y se recibió shape {mfcc_matrix.shape}"
         )
 
-    try:
-        labels = kmeans.predict(mfcc_vectors)
-    except Exception as e:
-        raise RuntimeError(f"Error prediciendo codewords: {e}")
+    # Broadcast: (n_frames, n_mfcc) - (1, n_mfcc)
+    return (mfcc_matrix - mean[None, :]) / std[None, :]
 
+
+def _build_histogram(mfcc_matrix: np.ndarray, kmeans) -> np.ndarray:
+    """
+    Dada una matriz MFCC normalizada (n_frames, n_mfcc), asigna cada frame
+    a un codeword y construye un histograma de conteos de tamaño K_CODEBOOK.
+
+    No se normaliza el histograma aquí (se deja en conteos absolutos),
+    ya que build_inverted_index.py se encarga de calcular TF / TF-IDF.
+    """
+    if mfcc_matrix.shape[0] == 0:
+        raise ValueError("Matriz MFCC vacía al construir histograma.")
+
+    # labels: shape (n_frames,)
+    labels = kmeans.predict(mfcc_matrix)
+
+    # Histograma de conteos por codeword
     hist = np.bincount(labels, minlength=K_CODEBOOK).astype(np.float32)
     return hist
 
 
-def load_all_mfcc_paths():
-    """Obtiene la lista de archivos .npy de MFCC almacenados."""
-    if not os.path.exists(MFCC_DIR):
-        raise FileNotFoundError(f"El directorio MFCC no existe: {MFCC_DIR}")
-
-    return [
-        os.path.join(MFCC_DIR, f)
-        for f in os.listdir(MFCC_DIR)
-        if f.lower().endswith(".npy")
-    ]
-
-
-# ============================================================
-# TF-IDF (global sobre todos los histogramas)
-# ============================================================
-
-def apply_tfidf(hist_matrix):
+def _hist_path_for_mfcc(mfcc_path: str) -> str:
     """
-    Aplica TF-IDF global y normalización L2.
-    Esto mejora bastante la discriminación en búsqueda.
+    Construye la ruta de salida en HIST_DIR correspondiente a un archivo MFCC en MFCC_DIR,
+    preservando la estructura de subcarpetas.
+
+    Ejemplo:
+        MFCC_DIR = /.../features/mfcc
+        mfcc_path = /.../features/mfcc/folder/123.npy
+
+        → HIST_DIR/folder/123.npy
     """
-    transformer = TfidfTransformer(norm=None, sublinear_tf=True)
+    rel_path = os.path.relpath(mfcc_path, MFCC_DIR)
+    rel_dir, fname = os.path.split(rel_path)
+    base, _ = os.path.splitext(fname)
 
-    tfidf = transformer.fit_transform(hist_matrix).toarray()
+    out_dir = os.path.join(HIST_DIR, rel_dir)
+    os.makedirs(out_dir, exist_ok=True)
 
-    # Normalizar por L2 → necesario para similitud coseno
-    tfidf = normalize(tfidf, norm="l2")
-
-    return tfidf
-
-
-# ============================================================
-# GUARDADO
-# ============================================================
-
-def save_histogram(audio_id, hist_vector):
-    """Guarda el histograma TF-IDF (o crudo) en formato .npy."""
-    os.makedirs(HIST_DIR, exist_ok=True)
-
-    out_path = os.path.join(HIST_DIR, audio_id + ".npy")
-    np.save(out_path, hist_vector)
+    return os.path.join(out_dir, f"{base}.npy")
 
 
-# ============================================================
-# MAIN
-# ============================================================
-
-def main(apply_tfidf_flag=True):
-
-    print("\n=== GENERACIÓN DE HISTOGRAMAS ===\n")
-
-    # 1. Cargar codebook
-    print("Cargando codebook...")
-    kmeans = load_codebook()
-
-    # 2. Obtener lista de MFCC
-    print("Buscando archivos MFCC...")
-    mfcc_files = load_all_mfcc_paths()
-
-    if len(mfcc_files) == 0:
-        raise RuntimeError(
-            f"No se encontraron MFCC en {MFCC_DIR}. Ejecuta extract_mfcc.py primero."
+def generate_histograms():
+    """
+    Genera histogramas para todos los archivos MFCC en MFCC_DIR
+    y los guarda en HIST_DIR.
+    """
+    if not os.path.exists(CODEBOOK_PATH):
+        raise FileNotFoundError(
+            f"No se encontró el codebook en {CODEBOOK_PATH}. "
+            f"Primero ejecuta build_codebook.py."
         )
 
-    print(f"MFCC encontrados: {len(mfcc_files)}")
+    print(f"[INFO] Cargando codebook desde: {CODEBOOK_PATH}")
+    kmeans = joblib.load(CODEBOOK_PATH)
 
-    all_hists = []
-    audio_ids = []
+    print(f"[INFO] Cargando estadísticas globales de MFCC desde: {STATS_PATH}")
+    mean, std = _load_global_stats()
 
-    # 3. Generación de histogramas
-    print("\nGenerando histogramas...\n")
+    mfcc_paths = _iter_mfcc_paths()
+    if not mfcc_paths:
+        raise RuntimeError(f"No se encontraron archivos .npy en {MFCC_DIR}")
 
-    for mf_path in tqdm(mfcc_files):
-        audio_id = os.path.splitext(os.path.basename(mf_path))[0]
+    print(f"[INFO] Generando histogramas para {len(mfcc_paths)} archivos MFCC...\n")
 
+    n_ok = 0
+    n_fail = 0
+
+    for mfcc_path in tqdm(mfcc_paths, desc="Histogramas"):
         try:
-            mfcc_matrix = np.load(mf_path)
+            mfcc = _load_mfcc(mfcc_path)
+            mfcc_norm = normalize_mfcc(mfcc, mean, std)
+            hist = _build_histogram(mfcc_norm, kmeans)
+
+            out_path = _hist_path_for_mfcc(mfcc_path)
+            np.save(out_path, hist)
+
+            n_ok += 1
         except Exception as e:
-            raise RuntimeError(f"Error cargando MFCC {mf_path}: {e}")
+            print(f"[WARN] Falló {mfcc_path}: {e}")
+            n_fail += 1
 
-        hist = compute_histogram(mfcc_matrix, kmeans)
+    print("\n[RESUMEN] Generación de histogramas completada.")
+    print(f"  - Histogramas generados correctamente: {n_ok}")
+    print(f"  - Archivos con error:                 {n_fail}")
+    print(f"  - Directorio de salida:               {HIST_DIR}")
 
-        all_hists.append(hist)
-        audio_ids.append(audio_id)
 
-    all_hists = np.array(all_hists, dtype=np.float32)
-
-    # 4. TF-IDF opcional
-    if apply_tfidf_flag:
-        print("\nAplicando TF-IDF global...")
-        all_hists = apply_tfidf(all_hists)
-
-    # 5. Guardar uno por uno
-    print("\nGuardando histogramas individuales...\n")
-    for audio_id, hist in zip(audio_ids, all_hists):
-        save_histogram(audio_id, hist)
-
-    print("\nHistograms generados correctamente en:", HIST_DIR)
-    print("Cantidad total:", len(audio_ids))
+if __name__ == "__main__":
+    generate_histograms()

@@ -1,156 +1,218 @@
+# audio/index/inverted/search_inverted.py
 """
 search_inverted.py
 ------------------
-Búsqueda eficiente basada en Índice Invertido Acústico (TF-IDF).
+Búsqueda eficiente basada en Índice Invertido Acústico (TF–IDF).
 
 Escenario actual del proyecto:
 - build_inverted_index.py construye un índice invertido a partir de
-  histogramas .npy ya TF-IDF (y normalizados) generados por generate_histograms.py.
+  histogramas .npy de CONTEOS (uno por track) generados por generate_histograms.py.
 - inverted_index.json almacena, por cada codeword, una posting list:
-      word_id -> [ { "audio_id": ..., "score": tfidf_wd }, ... ]
+      term_idx -> [ { "audio_id": ..., "score": tfidf_wd }, ... ]
 - doc_norms.json almacena la norma L2 del vector tf-idf de cada documento.
+- idf.npy almacena el vector IDF global (longitud K_CODEBOOK).
 
 Este módulo:
 - Recibe como entrada un histograma de consulta (vector 1D de longitud K_CODEBOOK),
-- Lo normaliza,
-- Usa el índice invertido para acumular productos escalares parciales,
-- Normaliza por las normas de los documentos -> similitud tipo coseno,
+  con CONTEOS de codewords del audio de consulta.
+- Lo convierte a TF–IDF usando el mismo IDF global.
+- Normaliza el vector de consulta.
+- Usa el índice invertido para acumular productos escalares parciales.
+- Normaliza por las normas de los documentos -> similitud tipo coseno.
 - Devuelve el Top-K como lista de (audio_id, similitud).
 """
 
 import os
 import json
-import numpy as np
-from heapq import heappush, heappop
+from typing import List, Tuple, Dict, Optional
 
-from audio.config import (
-    INDEX_INV_DIR,
-    K_CODEBOOK
-)
+import numpy as np
+
+from audio.config import INDEX_INV_DIR, K_CODEBOOK, TOP_K
 
 
 class InvertedIndexSearch:
-    def __init__(self):
-        print("[INFO] Cargando índice invertido...")
+    """
+    Buscador sobre índice invertido acústico basado en TF–IDF.
 
-        index_path = os.path.join(INDEX_INV_DIR, "inverted_index.json")
-        norms_path = os.path.join(INDEX_INV_DIR, "doc_norms.json")
+    Usa:
+      - inverted_index.json
+      - doc_norms.json
+      - idf.npy
+
+    construidos previamente con build_inverted_index.py.
+    """
+
+    def __init__(self, index_dir: Optional[str] = None):
+        """
+        index_dir:
+          Carpeta donde se encuentran inverted_index.json, doc_norms.json e idf.npy.
+          Si es None, se usa INDEX_INV_DIR de audio.config.
+        """
+        self.index_dir = index_dir or INDEX_INV_DIR
+
+        self.inverted_index: Dict[str, List[Dict[str, float]]] = {}
+        self.doc_norms: Dict[str, float] = {}
+        self.idf: np.ndarray = np.empty(K_CODEBOOK, dtype=np.float32)
+
+        self._load_index()
+
+    # ------------------------------------------------------------------
+    # Carga de índice
+    # ------------------------------------------------------------------
+    def _load_index(self):
+        """
+        Carga inverted_index.json, doc_norms.json e idf.npy desde index_dir.
+        """
+        index_path = os.path.join(self.index_dir, "inverted_index.json")
+        norms_path = os.path.join(self.index_dir, "doc_norms.json")
+        idf_path = os.path.join(self.index_dir, "idf.npy")
 
         if not os.path.exists(index_path):
             raise FileNotFoundError(
-                f"No se encontró {index_path}. Ejecuta build_inverted_index.py primero."
+                f"No se encontró inverted_index.json en {index_path}. "
+                f"Asegúrate de haber ejecutado build_inverted_index.py."
             )
-
         if not os.path.exists(norms_path):
             raise FileNotFoundError(
-                f"No se encontró {norms_path}. Ejecuta build_inverted_index.py primero."
+                f"No se encontró doc_norms.json en {norms_path}. "
+                f"Asegúrate de haber ejecutado build_inverted_index.py."
+            )
+        if not os.path.exists(idf_path):
+            raise FileNotFoundError(
+                f"No se encontró idf.npy en {idf_path}. "
+                f"Asegúrate de haber ejecutado build_inverted_index.py."
             )
 
-        with open(index_path, "r") as f:
+        with open(index_path, "r", encoding="utf-8") as f:
             self.inverted_index = json.load(f)
 
-        with open(norms_path, "r") as f:
+        with open(norms_path, "r", encoding="utf-8") as f:
             self.doc_norms = json.load(f)
 
-        print("[OK] Índice invertido cargado.")
+        self.idf = np.load(idf_path).astype(np.float32)
 
-    # ================================================================
-    # Utilidad: normalizar vector de consulta
-    # ================================================================
-    def _normalize_query(self, hist_vector: np.ndarray):
-        """
-        Recibe un histograma 1D (longitud K_CODEBOOK),
-        lo convierte a float, revisa tamaño y devuelve
-        (vector_normalizado, norma_original).
-        """
-        hist_vector = np.asarray(hist_vector, dtype=float)
-
-        # Asegurarnos de que sea 1D
-        if hist_vector.ndim > 1:
-            hist_vector = hist_vector.ravel()
-
-        if hist_vector.shape[0] != K_CODEBOOK:
+        if self.idf.ndim != 1 or self.idf.size != K_CODEBOOK:
             raise ValueError(
-                f"El histograma de consulta tiene tamaño {hist_vector.shape[0]}, "
-                f"pero se esperaba K_CODEBOOK={K_CODEBOOK}."
+                f"Vector IDF inválido en {idf_path}: se esperaba shape ({K_CODEBOOK},), "
+                f"y se obtuvo {self.idf.shape}"
             )
 
-        norm = np.linalg.norm(hist_vector)
-        if norm == 0.0:
-            # Query sin información
-            return hist_vector, 0.0
-
-        q_normed = hist_vector / norm
-        return q_normed, norm
-
-    # ================================================================
-    # BÚSQUEDA TOP-K POR ÍNDICE INVERTIDO
-    # ================================================================
-    def search(self, query_hist: np.ndarray, k: int = 5):
+    # ------------------------------------------------------------------
+    # Construcción del vector de consulta
+    # ------------------------------------------------------------------
+    def _build_query_vector(self, hist_vector: np.ndarray) -> Tuple[np.ndarray, float]:
         """
-        Realiza búsqueda usando el índice invertido.
+        Dado un histograma de CONTEOS (vector 1D de longitud K_CODEBOOK),
+        construye el vector TF–IDF normalizado de la consulta.
 
-        Parámetros
-        ----------
-        query_hist : np.ndarray
-            Histograma de consulta (1D, longitud K_CODEBOOK), típicamente uno
-            de los .npy en features/histograms/ (TF-IDF+L2).
-        k : int
-            Número de documentos a retornar.
-
-        Retorna
-        -------
-        list[tuple[str, float]]
-            Lista ordenada de (audio_id, similitud) de mayor a menor similitud.
+        Retorna:
+          - q_vec: vector TF–IDF normalizado (||q_vec|| = 1).
+          - q_norm: norma L2 del vector TF–IDF original antes de normalizar.
         """
-        print("[INFO] Ejecutando búsqueda por índice invertido...")
+        if hist_vector is None:
+            raise ValueError("hist_vector de consulta no puede ser None")
 
-        q_vec, q_norm = self._normalize_query(query_hist)
-        if q_norm == 0.0:
-            # No hay información en el query
+        hist_vector = np.asarray(hist_vector, dtype=np.float32)
+
+        if hist_vector.ndim != 1:
+            raise ValueError(
+                f"Se esperaba hist_vector 1D, pero se recibió shape {hist_vector.shape}"
+            )
+
+        if hist_vector.size != K_CODEBOOK:
+            raise ValueError(
+                f"El hist_vector tiene longitud {hist_vector.size}, "
+                f"se esperaba K_CODEBOOK={K_CODEBOOK}"
+            )
+
+        total = float(hist_vector.sum())
+        if total <= 0.0:
+            # Consulta vacía -> no hay información
+            return np.zeros(K_CODEBOOK, dtype=np.float32), 0.0
+
+        # TF (frecuencia relativa)
+        tf = hist_vector / total  # shape (K_CODEBOOK,)
+
+        # TF–IDF del query usando el mismo IDF que los documentos
+        tfidf_q = tf * self.idf  # shape (K_CODEBOOK,)
+
+        q_norm = float(np.linalg.norm(tfidf_q))
+        if q_norm <= 0.0:
+            # Todas las componentes quedaron a cero
+            return np.zeros(K_CODEBOOK, dtype=np.float32), 0.0
+
+        # Vector de consulta normalizado (norma 1)
+        q_vec = tfidf_q / q_norm
+        return q_vec.astype(np.float32), q_norm
+
+    # ------------------------------------------------------------------
+    # Búsqueda
+    # ------------------------------------------------------------------
+    def search(
+        self,
+        hist_vector: np.ndarray,
+        k: Optional[int] = None,
+        min_score: float = 0.0,
+    ) -> List[Tuple[str, float]]:
+        """
+        Realiza la búsqueda dada una consulta en forma de histograma de CONTEOS.
+
+        Parámetros:
+          - hist_vector: vector 1D de longitud K_CODEBOOK con conteos por codeword.
+          - k: número máximo de resultados a devolver. Si es None, usa TOP_K.
+          - min_score: umbral mínimo de similitud coseno para incluir un resultado.
+
+        Retorna:
+          Lista de tuplas (audio_id, score), ordenada por score descendente.
+        """
+        if k is None:
+            k = TOP_K
+
+        if k <= 0:
             return []
 
-        # índices de palabras activas en el query
-        active_words = np.where(q_vec > 0)[0]
+        # 1. Construir vector de consulta normalizado
+        q_vec, q_norm = self._build_query_vector(hist_vector)
+        if q_norm <= 0.0:
+            # Consulta sin información útil
+            return []
 
-        scores = {}  # doc_id -> acumulador de producto escalar
+        # 2. Acumular productos escalares parciales usando el índice invertido
+        scores: Dict[str, float] = {}
 
-        # Acumular dot product parcial usando posting lists
-        for w_idx in active_words:
-            w_str = str(int(w_idx))
-            q_weight = float(q_vec[w_idx])
+        # Usamos solo los términos donde q_vec[j] != 0 para ahorrar trabajo
+        nonzero_indices = np.nonzero(q_vec)[0]
 
-            postings = self.inverted_index.get(w_str, [])
+        for term_idx in nonzero_indices:
+            w_q = float(q_vec[term_idx])  # peso de la consulta (ya normalizada)
+            term_key = str(int(term_idx))
+
+            postings = self.inverted_index.get(term_key)
             if not postings:
                 continue
 
-            for entry in postings:
-                doc_id = entry["audio_id"]
-                d_weight = float(entry["score"])  # tfidf_wd
+            for posting in postings:
+                audio_id = posting["audio_id"]
+                w_d = float(posting["score"])  # tfidf_j del documento
 
-                scores.setdefault(doc_id, 0.0)
-                scores[doc_id] += q_weight * d_weight
+                # Acumulamos q_vec · d (producto escalar no normalizado por ||d||)
+                scores[audio_id] = scores.get(audio_id, 0.0) + w_q * w_d
 
-        # Pasar a similitud tipo coseno: sim = dot / (||q|| * ||d||)
-        # q ya está normalizado a norma 1, así que ||q|| = 1.
-        heap = []
+        if not scores:
+            return []
 
-        for doc_id, dot_val in scores.items():
-            d_norm = float(self.doc_norms.get(doc_id, 0.0))
-            if d_norm <= 0.0:
+        # 3. Convertir a similitud coseno: cos(q, d) = (q_vec · d) / ||d||
+        results: List[Tuple[str, float]] = []
+        for audio_id, num in scores.items():
+            doc_norm = float(self.doc_norms.get(audio_id, 0.0))
+            if doc_norm <= 0.0:
                 continue
 
-            sim = dot_val / d_norm  # ||q|| = 1
+            score = num / doc_norm  # cos(q, d)
+            if score >= min_score:
+                results.append((audio_id, score))
 
-            # Mantenemos heap de tamaño K
-            heappush(heap, (sim, doc_id))
-            if len(heap) > k:
-                heappop(heap)
-
-        # Ordenar resultados del más similar al menos similar
-        heap.sort(reverse=True, key=lambda x: x[0])
-
-        # Formato de salida esperado por el test: (audio_id, similitud)
-        results = [(doc_id, sim) for (sim, doc_id) in heap]
-
-        return results
+        # 4. Ordenar por score descendente y cortar top-k
+        results.sort(key=lambda x: x[1], reverse=True)
+        return results[:k]
