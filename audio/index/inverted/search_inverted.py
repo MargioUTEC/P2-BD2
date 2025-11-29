@@ -43,23 +43,38 @@ class InvertedIndexSearch:
     construidos previamente con build_inverted_index.py.
     """
 
-    def __init__(self, index_dir: Optional[str] = None):
+    def __init__(
+        self,
+        index_dir: Optional[str] = None,
+        inverted_index: Optional[Dict[str, List[Dict[str, float]]]] = None,
+        doc_norms: Optional[Dict[str, float]] = None,
+        idf: Optional[np.ndarray] = None,
+    ):
         """
         index_dir:
           Carpeta donde se encuentran inverted_index.json, doc_norms.json e idf.npy.
           Si es None, se usa INDEX_INV_DIR de audio.config.
+
+          inverted_index/doc_norms/idf:
+          Permiten inyectar estructuras en memoria (útil para experimentos) y
+          evitar la carga desde disco. Si cualquiera de ellos es None, se leerá
+          desde ``index_dir``.
         """
         self.index_dir = index_dir or INDEX_INV_DIR
 
-        self.inverted_index: Dict[str, List[Dict[str, float]]] = {}
-        self.doc_norms: Dict[str, float] = {}
-        self.idf: np.ndarray = np.empty(K_CODEBOOK, dtype=np.float32)
+        self.inverted_index: Dict[str, List[Dict[str, float]]] = inverted_index or {}
+        self.doc_norms: Dict[str, float] = doc_norms or {}
+        self.idf: np.ndarray = (
+            np.asarray(idf, dtype=np.float32) if idf is not None else np.empty(K_CODEBOOK, dtype=np.float32)
+        )
 
-        self._load_index()
+        if not inverted_index or not doc_norms or idf is None:
+            self._load_index()
+        else:
+            self._validate_idf()
 
-    # ------------------------------------------------------------------
+
     # Carga de índice
-    # ------------------------------------------------------------------
     def _load_index(self):
         """
         Carga inverted_index.json, doc_norms.json e idf.npy desde index_dir.
@@ -91,16 +106,15 @@ class InvertedIndexSearch:
             self.doc_norms = json.load(f)
 
         self.idf = np.load(idf_path).astype(np.float32)
+        self._validate_idf()
 
+    def _validate_idf(self):
         if self.idf.ndim != 1 or self.idf.size != K_CODEBOOK:
             raise ValueError(
-                f"Vector IDF inválido en {idf_path}: se esperaba shape ({K_CODEBOOK},), "
-                f"y se obtuvo {self.idf.shape}"
+                f"Vector IDF inválido: se esperaba shape ({K_CODEBOOK},), se obtuvo {self.idf.shape}"
             )
 
-    # ------------------------------------------------------------------
     # Construcción del vector de consulta
-    # ------------------------------------------------------------------
     def _build_query_vector(self, hist_vector: np.ndarray) -> Tuple[np.ndarray, float]:
         """
         Dado un histograma de CONTEOS (vector 1D de longitud K_CODEBOOK),

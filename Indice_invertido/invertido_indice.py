@@ -1,28 +1,43 @@
-import pandas as pd
-import nltk
-from nltk.stem.snowball import SnowballStemmer
-from nltk.tokenize import RegexpTokenizer
-from collections import defaultdict
+# import pandas as pd
+# import nltk
+# from nltk.stem.snowball import SnowballStemmer
+# from nltk.tokenize import RegexpTokenizer
+# from collections import defaultdict
 import os
 import math
 import pickle
 import time
+from collections import defaultdict
+from typing import Iterable, List, Optional, Tuple
+
+import nltk
+import pandas as pd
+from nltk.stem.snowball import SnowballStemmer
+from nltk.tokenize import RegexpTokenizer
 
 nltk.download('punkt')
 
 class CustomInvertedIndex:
     def __init__(self,
-                 dataset_path=None,
-                 columns={'id': 'track_id', 'text': ['lyrics', 'track_name', 'track_artist', 'playlist_genre']},
-                 stoplist_path=None,
-                 index_path=None,
-                 block_limit=500):
+                 dataset_path: Optional[str] = None,
+                 dataframe: Optional[pd.DataFrame] = None,
+                 columns: dict = None,
+                 stoplist_path: Optional[str] = None,
+                 index_path: Optional[str] = None,
+                 block_limit: int = 500):
 
         BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
         self.dataset_path = dataset_path or os.path.join(BASE_DIR, "dataset", "musica.csv")
         self.stoplist_path = stoplist_path or os.path.join(BASE_DIR, "dataset", "stoplist.txt")
         self.path = index_path or os.path.join(BASE_DIR, "dataset", "inverted_index")
+
+        columns = columns or {
+            'id': 'track_id',
+            'text': ['lyrics', 'track_name', 'track_artist', 'playlist_genre']
+        }
+
+
 
         self.id_column = columns['id']
         self.text_fields = columns['text']
@@ -40,8 +55,15 @@ class CustomInvertedIndex:
             print("Stoplist no encontrada, usando vacío.")
         self.stoplist.update(['?', '-', '.', ':', ',', '!', ';', '_'])
 
-        # Cargar CSV
-        self.data = pd.read_csv(self.dataset_path)
+        # Cargar dataset
+        if dataframe is not None:
+            self.data = dataframe.copy()
+        else:
+            self.data = pd.read_csv(self.dataset_path)
+
+        if self.id_column not in self.data:
+            raise ValueError(f"El dataset no contiene la columna de id '{self.id_column}'.")
+
         self.data.dropna(subset=self.text_fields, inplace=True)
         self.total_docs = len(self.data)
 
@@ -173,6 +195,63 @@ class CustomInvertedIndex:
         for f in os.listdir(self.path):
             if f.startswith("temp_block_"):
                 os.remove(os.path.join(self.path, f))
+
+    def _load_index_from_disk(self):
+        index_file = os.path.join(self.path, "final_index.bin")
+        norms_file = os.path.join(self.path, "doc_norms.pkl")
+
+        if not os.path.exists(index_file) or not os.path.exists(norms_file):
+            raise FileNotFoundError(
+                "No se encontró el índice almacenado. Ejecute build_index() antes de buscar."
+            )
+
+        with open(index_file, "rb") as f:
+            self.index_data = pickle.load(f)
+
+        with open(norms_file, "rb") as f:
+            self.doc_norms = pickle.load(f)
+
+    def _preprocess_query(self, query: str, fields: Optional[Iterable[str]] = None) -> List[str]:
+        fields = list(fields) if fields else [self.text_fields[0]]
+        query = query.lower()
+        tokenizer = RegexpTokenizer(r"\w+")
+        words = tokenizer.tokenize(query)
+        return [
+            f"{field}:{self.stemmer.stem(word)}"
+            for word in words
+            for field in fields
+            if word.isascii() and len(word) >= 2 and word.isalpha() and word not in self.stoplist
+        ]
+
+    def search(self, query: str, top_k: int = 10, fields: Optional[Iterable[str]] = None) -> Tuple[List[Tuple[str, float]], float]:
+        start = time.time()
+
+        if not hasattr(self, "index_data") or not hasattr(self, "doc_norms"):
+            self._load_index_from_disk()
+
+        terms = self._preprocess_query(query, fields)
+        scores = defaultdict(float)
+
+        for term in terms:
+            postings = self.index_data.get(term)
+            if not postings:
+                continue
+
+            idf = self.idf.get(term, 0)
+            for doc_id, freq in postings.items():
+                tf = math.log10(1 + freq)
+                scores[doc_id] += tf * idf
+
+        results = []
+        for doc_id, score in scores.items():
+            norm = self.doc_norms.get(doc_id)
+            if norm:
+                results.append((doc_id, score / norm))
+
+        results.sort(key=lambda x: x[1], reverse=True)
+        elapsed = time.time() - start
+        return results[:top_k], elapsed
+
 
 
 if __name__ == "__main__":

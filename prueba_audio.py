@@ -5,13 +5,10 @@ import glob
 import random
 import time
 
-# CONFIGURACIÓN 
+ 
 CARPETA_DATOS = "./audio/features/histograms"
-
-# 2. ESCALA DE 'N', se clonará los 7,994 datos para llegar a estos números.
 N_VALUES = [2000, 4000, 8000, 16000, 32000] 
 
-# 3. Conexión a tu Docker
 DB_CONFIG = {
     "host": "localhost", "port": "5433", 
     "user": "dianananez", "password": "proyecto2bd", "dbname": "multimedia_db"
@@ -24,7 +21,6 @@ def conectar():
 def main():
     print("=" * 60)
 
-    #1. CARGAR LOS DATOS
     print(f"Leyendo archivos desde: {CARPETA_DATOS}")
     archivos = glob.glob(os.path.join(CARPETA_DATOS, "*.npy"))
     
@@ -46,11 +42,10 @@ def main():
     vectores_memoria = []
     print("Cargando archivos...")
     
-    # Leemos todos tus 7994 archivos
+    # Leemos todos los archivos
     for ruta in archivos: 
         try:
             d = np.load(ruta)
-            # Convertimos a lista (promediando si es necesario)
             v = d.tolist() if d.ndim == 1 else np.mean(d.T, axis=0).tolist()
             if len(v) == DIMENSION:
                 vectores_memoria.append(v)
@@ -58,14 +53,13 @@ def main():
 
     print(f"Vectores reales cargados: {len(vectores_memoria)}")
 
-    #2.CLONACIÓN AUTOMÁTICA
     MAX_N = max(N_VALUES)
     while len(vectores_memoria) < MAX_N:
         print(f"Tienes {len(vectores_memoria)}, pero necesitamos {MAX_N}. Duplicando datos...")
         vectores_memoria += vectores_memoria
     
-    # Recortamos para no usar memoria de más
-    vectores_memoria = vectores_memoria[:MAX_N] 
+#recorte de memoria
+        vectores_memoria = vectores_memoria[:MAX_N] 
     
     print(f"Total listo para el experimento: {len(vectores_memoria)}")
     print("-" * 60)
@@ -76,14 +70,11 @@ def main():
     conn.autocommit = True
     cur = conn.cursor()
 
-    # 3. Llenar la tabla e ir midiendo tiempos
     for n in N_VALUES:
-        # A. Limpiar tabla anterior
         cur.execute("DROP TABLE IF EXISTS experimento_audio;")
         cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
         cur.execute(f"CREATE TABLE experimento_audio (id SERIAL PRIMARY KEY, embedding vector({DIMENSION}));")
         
-        # B. Insertar N datos (Insertamos por bloques para velocidad)
         lote = vectores_memoria[:n]
         datos_sql = [(v,) for v in lote]
         
@@ -92,12 +83,10 @@ def main():
             args = ','.join(cur.mogrify("(%s)", x).decode('utf-8') for x in chunk)
             cur.execute("INSERT INTO experimento_audio (embedding) VALUES " + args)
         
-        # C. Crear Índice HNSW (Esto hace que pgVector sea súper rápido)
         try:
             cur.execute("CREATE INDEX ON experimento_audio USING hnsw (embedding vector_l2_ops);")
         except: pass 
 
-        # D. Medir tiempo de consulta KNN (8 vecinos)
         query = str(np.random.rand(DIMENSION).tolist()) # Vector random para buscar
         tiempos = []
         for _ in range(5): # Hacemos 5 intentos para sacar promedio

@@ -30,7 +30,7 @@ def _iter_mfcc_paths():
 def _load_mfcc(path: str) -> np.ndarray:
     """
     Carga un archivo .npy de MFCC y valida su forma.
-    Esperamos una matriz 2D de shape (n_frames, n_mfcc).
+    Aqui esperamos una matriz 2D de shape (n_frames, n_mfcc).
     """
     mfcc = np.load(path)
     if mfcc.ndim != 2:
@@ -46,8 +46,6 @@ def _collect_training_samples(
     max_frames_per_file=1000,
 ) -> np.ndarray:
     """
-    Recolecta frames de MFCC de múltiples archivos para entrenar el codebook.
-
     - max_files: Máx. número de archivos MFCC a usar (None = todos).
     - max_frames_per_file: Máx. número de frames por archivo (muestra aleatoria).
     """
@@ -98,12 +96,11 @@ def build_codebook(
     random_state=42,
 ):
     """
-    Entrena el codebook (MiniBatchKMeans) y guarda:
-      - codebook_kmeans.joblib  (modelo KMeans)
-      - mfcc_stats.npz          (media y std globales de MFCC)
+    Entrena el codebook y guarda:
+      - codebook_kmeans.joblib 
+      - mfcc_stats.npz          (media y std globales)
 
-    La normalización que se usará luego en generate_histograms.py
-    será consistente con estas estadísticas globales.
+    La normalización que se usará luego en generate_histograms.py será con estas estadísticas globales.
     """
     if max_iter is None:
         max_iter = MAX_KMEANS_ITER
@@ -116,17 +113,18 @@ def build_codebook(
     if not mfcc_paths:
         raise RuntimeError(f"No se encontraron archivos .npy en {MFCC_DIR}")
 
-    # 1. Recolectar frames para entrenamiento
+    #Recolecta frames para entrenamiento
     training_data = _collect_training_samples(
         mfcc_paths,
         max_files=max_files,
         max_frames_per_file=max_frames_per_file,
     )
 
-    # 2. Calcular media y std globales y guardarlas
+    #Calcula media y std globales y las guarda
     print("\n[INFO] Calculando media y desviación estándar globales de MFCC...")
     global_mean = training_data.mean(axis=0)
     global_std = training_data.std(axis=0)
+
     # Evitar división por cero
     global_std[global_std == 0.0] = 1e-8
 
@@ -138,11 +136,11 @@ def build_codebook(
     )
     print(f"[OK] Estadísticas globales guardadas en: {stats_path}")
 
-    # 3. Normalizar training_data con las stats globales
+    #Normalizar training_data con las stats globales
     training_data = (training_data - global_mean[None, :]) / global_std[None, :]
     training_data = training_data.astype(np.float32)
 
-    # 4. Entrenar MiniBatchKMeans
+    #Entrena MiniBatchKMeans
     print("\n[INFO] Entrenando MiniBatchKMeans (codebook)...\n")
     kmeans = MiniBatchKMeans(
         n_clusters=K_CODEBOOK,

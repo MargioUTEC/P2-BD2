@@ -18,9 +18,7 @@ from .ast_nodes import (
 from .parser_sql import ParserSQL
 
 
-# ============================================================
 # Utilidades internas
-# ============================================================
 
 ALLOWED_TABLES = {"metadata"}
 ALLOWED_COLUMNS = {"track_id", "title", "artist", "genre", "year"}
@@ -29,10 +27,7 @@ ALLOWED_COLUMNS = {"track_id", "title", "artist", "genre", "year"}
 def normalize_tid(value: Any) -> str:
     """
     Normaliza un track_id a 6 dígitos, solo si luce como número.
-    Ejemplos:
-        34996   -> "034996"
-        "34996" -> "034996"
-        "034996"-> "034996"
+    Ejemplo: 34996   -> "034996"
     """
     s = str(value).strip()
     if s.isdigit():
@@ -40,18 +35,12 @@ def normalize_tid(value: Any) -> str:
     return s
 
 
-# ============================================================
-# MetadataQueryEngine
-# ============================================================
-
 class MetadataQueryEngine:
     """
     Motor de consultas para la tabla metadata (metadata.db).
 
     Soporta:
       - SELECT ... FROM metadata WHERE ...
-      - Entrada corta: solo la condición WHERE
-        (ej: 'artist = "Radiohead" AND year >= 2000')
 
     Uso típico:
 
@@ -65,11 +54,9 @@ class MetadataQueryEngine:
 
     El resultado es un dict:
 
-        {
-            "sql": "SELECT * FROM metadata WHERE artist = ? AND year >= ?;",
+        {   "sql": "SELECT * FROM metadata WHERE artist = ? AND year >= ?;",
             "params": ["Radiohead", 2000],
-            "rows": [ { "track_id": "...", "title": "...", ... }, ... ]
-        }
+            "rows": [ { "track_id": "...", "title": "...", ... }, ... ]}
     """
 
     def __init__(self, db_path: Union[str, Path, None] = None) -> None:
@@ -79,18 +66,13 @@ class MetadataQueryEngine:
         self.db_path = Path(db_path)
         self.parser = ParserSQL()
 
-    # -----------------------------
-    # API pública
-    # -----------------------------
-
+    # Llamamos a nuestra API pública
     def run_query(self, user_text: str) -> Dict[str, Any]:
         """
         Ejecuta una consulta de usuario sobre metadata.db.
 
-        - Si user_text comienza con SELECT:
-            se interpreta como SQL completo.
-        - Si no, se asume que es solo la condición WHERE y se envuelve en:
-            SELECT * FROM metadata WHERE {user_text}
+        - Si user_text comienza con SELECT, se interpreta como SQL completo.
+        - Cc se asume que es solo la condición WHERE
 
         Devuelve dict con:
             - "sql": str   (consulta ejecutada)
@@ -105,7 +87,7 @@ class MetadataQueryEngine:
 
         ast = self.parser.parse(query_text)
 
-        # La gramática podría devolver lista de sentencias; nos quedamos con la primera
+        # La gramática podría devolver lista de sentencias pero nosotros nos quedamos con la primera
         if isinstance(ast, list):
             if not ast:
                 raise ValueError("La consulta no contiene sentencias válidas.")
@@ -128,12 +110,10 @@ class MetadataQueryEngine:
             "rows": rows,
         }
 
-    # -----------------------------
+    
     # Construcción de SQL
-    # -----------------------------
 
     def _build_sql(self, stmt: SelectWhereNode) -> Tuple[str, List[Any]]:
-        # Tabla: por defecto "metadata"
         table = (stmt.table_name or "metadata").lower()
         if table not in ALLOWED_TABLES:
             raise ValueError(f"Tabla no permitida: {table!r}. Solo se admite 'metadata'.")
@@ -165,8 +145,7 @@ class MetadataQueryEngine:
 
     def _build_where(self, cond: Any) -> Tuple[str, List[Any]]:
         """
-        Convierte un árbol de condiciones (o incluso un Tree crudo de Lark)
-        en (sql_fragment, params).
+        Convierte un árbol de condiciones en (sql_fragment, params).
 
         Soporta:
           - ConditionNode
@@ -177,15 +156,13 @@ class MetadataQueryEngine:
           - Tree con un solo hijo (se delega en él)
         """
 
-        # ---------------------------------------------
         # 1) Caso especial: la gramática dejó un Tree
-        # ---------------------------------------------
         if isinstance(cond, Tree):
             # Si solo envuelve otra condición, delegamos directamente
             if len(cond.children) == 1:
                 return self._build_where(cond.children[0])
 
-            # and_condition_chain:  (left AND right)
+
             if cond.data == "and_condition_chain":
                 if len(cond.children) != 2:
                     raise ValueError(
@@ -199,7 +176,7 @@ class MetadataQueryEngine:
                 )
                 return self._build_where(node)
 
-            # or_condition_chain:  (left OR right)
+
             if cond.data == "or_condition_chain":
                 if len(cond.children) != 2:
                     raise ValueError(
@@ -216,9 +193,7 @@ class MetadataQueryEngine:
             # Cualquier otro Tree no esperado
             raise TypeError(f"Tree de condición no soportado: {cond.data!r}")
 
-        # ---------------------------------------------
         # 2) Condición simple: atributo OP valor
-        # ---------------------------------------------
         if isinstance(cond, ConditionNode):
             col = cond.attribute.strip()
             op = cond.operator.strip()
@@ -233,9 +208,7 @@ class MetadataQueryEngine:
             fragment = f"{col} {op} ?"
             return fragment, [value]
 
-        # ---------------------------------------------
-        # 3) BETWEEN
-        # ---------------------------------------------
+
         if isinstance(cond, BetweenConditionNode):
             col = cond.attribute.strip()
             if col not in ALLOWED_COLUMNS:
@@ -249,9 +222,7 @@ class MetadataQueryEngine:
             fragment = f"{col} BETWEEN ? AND ?"
             return fragment, [v1, v2]
 
-        # ---------------------------------------------
         # 4) Condición compuesta AND / OR
-        # ---------------------------------------------
         if isinstance(cond, ConditionComplexNode):
             left_sql, left_params = self._build_where(cond.left)
             right_sql, right_params = self._build_where(cond.right)
@@ -263,14 +234,9 @@ class MetadataQueryEngine:
             fragment = f"({left_sql} {op} {right_sql})"
             return fragment, left_params + right_params
 
-        # ---------------------------------------------
-        # 5) Cualquier otra cosa es inesperada
-        # ---------------------------------------------
         raise TypeError(f"Tipo de condición no soportado: {type(cond)}")
 
-    # -----------------------------
     # Ejecución SQLite
-    # -----------------------------
 
     def _execute_sql(self, sql: str, params: List[Any]) -> List[Dict[str, Any]]:
         if not self.db_path.exists():

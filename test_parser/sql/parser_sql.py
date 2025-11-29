@@ -15,11 +15,7 @@ from .ast_nodes import (
     SelectWhereNode,
 )
 
-
-# ============================================================
-# Helpers internos
-# ============================================================
-
+#Helpers del parser
 def _tokval(x: Any) -> Any:
     """Devuelve el valor crudo de un Token o el propio objeto."""
     if isinstance(x, Token):
@@ -34,15 +30,12 @@ def _strip_quotes(s: str) -> str:
     return s
 
 
-# ============================================================
-# Transformer: Árbol de Lark → AST propio
-# ============================================================
+# AST
 
 class SQLTransformer(Transformer):
     """
-    Transforma el árbol de Lark (según grammar_sql.lark) en nuestros nodos AST.
-
-    Nos interesan principalmente:
+    Transforma el árbol de Lark en los nodos de nuestro AST.
+Solo tomamos en cuenta las reglas relevantes:
       - select_stmt
       - where_clause
       - condition_*
@@ -53,10 +46,9 @@ class SQLTransformer(Transformer):
     # ---------- WHERE ----------
 
     def where_clause(self, children: List[Any]) -> ConditionType:
-        # Regla simple: WHERE <condición>
         return children[0]
 
-    # ---------- SELECT ----------
+    # -------- SELECT ----------
 
     def select_stmt(self, children: List[Any]) -> SelectWhereNode:
         """
@@ -133,14 +125,13 @@ class SQLTransformer(Transformer):
             except ValueError:
                 pass
 
-            # Si no es numérico, devolver como string cruda
+            # Si no es numérico, devolver como string
             return txt
 
-        # Si ya es algo transformado (por ejemplo, otro tipo)
+        # esto si ya es algo transformado
         return v
 
     # ---------- Condiciones simples ----------
-
     def condition_comparison(self, children: List[Any]) -> ConditionNode:
         """
         Regla del tipo:
@@ -169,7 +160,6 @@ class SQLTransformer(Transformer):
         )
 
     # ---------- Condiciones compuestas ----------
-
     def condition_complex(self, children: List[Any]) -> ConditionType:
         """
         children = [cond1, 'AND', cond2, 'OR', cond3, ...]
@@ -179,14 +169,14 @@ class SQLTransformer(Transformer):
             # Solo una condición
             return children[0]
 
-        # Primer par: cond1 OP cond2
+        # cond1 OP cond2
         node: ConditionType = ConditionComplexNode(
             left=children[0],
             operator=str(_tokval(children[1])).upper(),
             right=children[2],
         )
 
-        # Encadenar el resto (si existe)
+        # Encadenar el resto
         i = 3
         while i + 1 < len(children):
             op = str(_tokval(children[i])).upper()
@@ -205,11 +195,6 @@ class SQLTransformer(Transformer):
         Maneja condiciones entre paréntesis: ( ... )
         """
         return children[0]
-
-
-# ============================================================
-# Clase de alto nivel: ParserSQL
-# ============================================================
 
 class ParserSQL:
     """
@@ -236,13 +221,7 @@ class ParserSQL:
         )
 
     def parse(self, query: str) -> Union[SelectWhereNode, list[SelectWhereNode], Any]:
-        """
-        Recibe una consulta SQL en texto y devuelve el AST transformado.
-
-        Dependiendo de la gramática, el resultado puede ser:
-          - Un solo SelectWhereNode
-          - Una lista de nodos (si se permiten múltiples sentencias separadas por ;)
-        """
+        #Recibe una consulta SQL en texto y devuelve el AST transformado.
         tree = self.parser.parse(query)
         transformer = SQLTransformer()
         return transformer.transform(tree)

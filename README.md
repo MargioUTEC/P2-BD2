@@ -153,38 +153,41 @@ PostgreSQL no busca letra por letra. Lo que hace es "limpiar" el texto de la can
 
 | Tamaño de la colección (N) | MyIndex (Python) | PostgreSQL (GIN) |
 |---------------------------|------------------|------------------|
-| N = 2000                  | *pendiente* | **0.000686 s** |
-| N = 4000                  | *pendiente* | **0.000773 s** | 
-| N = 8000                  | *pendiente* | **0.000791 s** | 
-| N = 16000                 | *pendiente* | **0.000821 s** |
-| N = 32000                 | *pendiente* | **0.000917 s** |
+| N = 2000                  | **0.024411 s** | **0.000686 s** |
+| N = 4000                  | **0.049639 s** | **0.000773 s** | 
+| N = 8000                  | **0.097898 s** | **0.000791 s** | 
+| N = 16000                 | **0.148505 s** | **0.000821 s** |
+| N = 32000                 | **0.234036 s** | **0.000917 s** |
 
-> **Análisis:** El índice GIN mantiene un tiempo de respuesta casi constante (sub-milisegundo) incluso al duplicar el volumen de datos, demostrando una escalabilidad logarítmica ideal para este tipo de aplicaciones.
+> **Interpretación:** Nuestro indice invertido en Python escala linealmente porque accede a datos en memoria secundaria (disco), **pasando de 24ms a 234ms entre 2k y 32k datos**. En cambio, PostgreSQL GIN se mantiene casi constante (0.7–0.9 ms) gracias a sus estructuras persistentes optimizadas y al uso intensivo de caché, reduciendo los accesos al disco. Incluso con 32k documentos, GIN sigue siendo 250 veces más rápido.
 
-## Experimento 2: Búsqueda de Audio (Buscando Canciones Parecidas)
+## Experimento 2: Búsqueda de Audio (Buscando canciones parecidas)
 
 Aquí el reto era diferente. No buscamos palabras, sino "sonidos". Queríamos ver si PostgreSQL era capaz de encontrar canciones que suenen similar a otra (por ejemplo, si le doy una canción de rock, que me devuelva otras de rock) en cuestión de milisegundos.
 
 ### ¿Cómo lo hicimos si nos faltaban datos?
-Teníamos unas ~8,000 canciones procesadas (histogramas), pero para hacer la comparación con distintos tamaños "clonamos" nuestras canciones reales automáticamente en la base de datos hasta llenar el espacio de 32,000 registros.
+Teníamos unas aprox. 8000 canciones procesadas (histogramas) pero para hacer la comparación con distintos tamaños "clonamos" nuestras canciones reales automáticamente en la base de datos hasta llenar el espacio de 32000 registros.
 
 ### pgVector + HNSW
 Para lograr búsquedas de milisegundos, combinamos dos tecnologías clave:
 1.  **pgVector:** Permite a PostgreSQL entender y almacenar nuestros histogramas como **vectores matemáticos**, habilitando el cálculo de "distancia" (similitud) entre canciones.
-2.  **HNSW (Hierarchical Navigable Small World):** Es el índice que acelera el proceso. En lugar de comparar la consulta contra las 32,000 canciones una por una (búsqueda secuencial), HNSW va a organizar los datos en un **grafo de navegación**. Esto va a permite que el motor pueda "saltar" entre vecinos cercanos para encontrar el resultado casi al instante, sin recorrer toda la base de datos.
-### Resultados de Velocidad (Audio)
+2.  **HNSW (Hierarchical Navigable Small World):** Es el índice que acelera el proceso. En lugar de comparar la consulta contra las 32000 canciones una por una (búsqueda secuencial), HNSW va a organizar los datos en un **grafo de navegación**. Esto va a permite que el motor pueda "saltar" entre vecinos cercanos para encontrar el resultado casi al instante, sin recorrer toda la base de datos.
 
-La diferencia fue increíble. Incluso con 32,000 canciones, la base de datos responde en **casi 1 milisegundo**.
+### Resultados de Rendimiento (Audio)
 
 | Tamaño de la colección (N) | KNN-Secuencial | KNN-Indexado | KNN-PostgreSQL (HNSW) |
 |---------------------------|----------------|--------------|-----------------------|
-| N = 2000                  | *pendiente* | *pendiente* | **0.003123 s** |
-| N = 4000                  | *pendiente* | *pendiente* | **0.001308 s** |
-| N = 8000                  | *pendiente* | *pendiente* | **0.001528 s** |
-| N = 16000                 | *pendiente* | *pendiente* | **0.001373 s** |
-| N = 32000                 | *pendiente* | *pendiente* | **0.001176 s** |
+| N = 2000                  | **0.004280** | **0.033158** | **0.003123** |
+| N = 4000                  | **0.008537** | **0.086499** | **0.001308** |
+| N = 8000                  | **0.021026** | **0.234585** | **0.001528** |
+| N = 16000                 | **0.038309** | **0.480600** | **0.001373** |
+| N = 32000                 | **0.069718** | **1.022116** | **0.001176** |
 
-> **Dato Curioso:** Si se fijan, buscar entre 32,000 canciones fue más rápido que buscar entre 2,000. Esto pasa por el **"Calentamiento de Caché"**. La primera vez que buscamos (con 2k), la base de datos estaba "fría" y tuvo que leer del disco. Para cuando llegamos a 32k, ya tenía los atajos en la memoria RAM y voló.
+> **Interpretación*:** Como podemos ver, el KNN secuencial crece linealmente porque compara contra toda la colección de audios, el KNN invertido es más lento por la sobrecarga al combinar los postings. En cambio, HNSW en PostgreSQL se mantiene casi constante gracias a su estructura en grafo y ejecución en memoria. Incluso se observa que buscar entre 32000 canciones fue más rápido que entre 2000 debido al calentamiento de caché.
+
+### Impacto de la dimensionalidad en el rendimiento de los índices
+En este caso de búsqueda de audio, el rendimiento del índice depende en gran medida de la cantidad de dimensiones de los vectores almacenados. A medida que la dimensionalidad crece aparece *la maldición de la dimensionalidad*, las distancias entre vectores dejan de ser discriminantes, lo que reduce la precisión y aumenta el tiempo de respuesta. Esto se refleja en los tiempos obtenidos porque cuando el vector acústico tiene más dimensiones, el índice invertido se vuelve más pesado y la búsqueda pierde eficiencia.
+
 
 ## Ejecución del Proyecto
 ??? aqui me imagino que describimos los pasitos del proyecto

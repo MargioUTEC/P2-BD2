@@ -3,16 +3,10 @@ import csv
 import time
 import os
 
-# 1. Ruta de tu archivo real
 CSV_FILE = "./Indice_invertido/dataset/musica.csv"
-
-# 2. ESCALA DE 'N' (Según lo que aprobó el profe: 2k, 4k, 8k, 16k, 32k)
 N_VALUES = [2000, 4000, 8000, 16000, 32000]
-
-# 3. TIPO DE ÍNDICE ("GIN" y "GIST")
 TIPO_INDICE = "GIN"  
 
-# 4. Conexión a tu Docker
 DB_CONFIG = {
     "host": "localhost", "port": "5433", 
     "user": "dianananez", "password": "proyecto2bd", "dbname": "multimedia_db"
@@ -27,14 +21,14 @@ def main():
     print(f"Índice seleccionado: {TIPO_INDICE}")
     print("=" * 60)
 
-    # 1. CARGAR DATOS A MEMORIA
     datos_memoria = []
     try:
         print("Leyendo CSV...")
         with open(CSV_FILE, 'r', encoding='utf-8', errors='replace') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                # Aseguramos que existan las columnas (ajusta si tus cabeceras son distintas)
+
+                #columnas existentes
                 track = row.get('track_name', row.get('song_name', ''))
                 artist = row.get('artist_name', row.get('artist', ''))
                 lyrics = row.get('lyrics', row.get('text', ''))
@@ -46,7 +40,7 @@ def main():
 
     print(f"Canciones reales cargadas: {len(datos_memoria)}")
     
-    # CLONACIÓN AUTOMÁTICA
+    # CLONACIÓN
     MAX_N = max(N_VALUES)
     while len(datos_memoria) < MAX_N:
         print(f"Faltan datos para llegar a {MAX_N}. Duplicando dataset...")
@@ -61,9 +55,8 @@ def main():
     conn.autocommit = True
     cur = conn.cursor()
 
-    # --- 2. BUCLE DEL EXPERIMENTO ---
     for n in N_VALUES:
-        # A. Empezar de cero para este N
+        #Empezar de cero para este N
         cur.execute("DROP TABLE IF EXISTS experimento_texto;")
         cur.execute("""
             CREATE TABLE experimento_texto (
@@ -74,17 +67,14 @@ def main():
             );
         """)
         
-        # B. Insertar N registros (usando mogrify para velocidad)
+        #Insertar N registros (usando mogrify para velocidad)
         batch = datos_memoria[:n]
         args = ','.join(cur.mogrify("(%s,%s,%s)", x).decode('utf-8') for x in batch)
         cur.execute("INSERT INTO experimento_texto (track_name, artist_name, lyrics) VALUES " + args)
         
-        # C. Crear el Índice (GIN o GIST)
-        # 'spanish' optimiza la búsqueda para nuestro idioma
         cur.execute(f"CREATE INDEX idx_lyrics_gin ON experimento_texto USING {TIPO_INDICE} (to_tsvector('spanish', lyrics));")
         
-        # D. Medir Búsqueda (Promedio de 5 intentos)
-        consulta = "amor & guerra" # Buscamos canciones que tengan ambas palabras
+        consulta = "amor & guerra"
         tiempos = []
         for _ in range(5):
             t0 = time.time()

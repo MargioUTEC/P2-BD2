@@ -67,25 +67,20 @@ def main() -> None:
 
     engine = MetadataQueryEngine(db_path=db_path)
 
-    # --------------------------------------------------------
     # Lista de pruebas recomendadas
-    # Ajusta los valores (artistas, géneros, años) según tu dataset.
-    # --------------------------------------------------------
     test_queries = [
-        # 1) Forma corta: solo condición WHERE
+        #forma corta: solo condición
         'artist = "Psychadelik Pedestrian"',
         'genre = "Electronic" AND year >= 2010',
         'year BETWEEN 2010 AND 2015',
 
-        # 2) Forma larga: SELECT completo
+        #forma larga: SELECT completo
         '''
         SELECT track_id, title, artist
         FROM metadata
         WHERE genre = "Electronic" AND year >= 2010
         ''',
-
-        # 3) Búsqueda por track_id (probar normalización a 6 dígitos)
-        'track_id = "34996"',   # debería normalizarse a "034996" si existe
+        'track_id = "34996"',  
     ]
 
     for q in test_queries:

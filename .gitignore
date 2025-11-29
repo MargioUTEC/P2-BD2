@@ -9,3 +9,15 @@ venv/
 .vscode/
 *.pkl
 *.DS_Store.venv/
+
+# Artefactos de índices (no versionar)
+experimentacion/dataset/
+
+# Cosas de macOS y entorno
+.DS_Store
+.venv/
+audio/.DS_Store
+audio/index/.DS_Store
+
+# Archivos temporales
+mis_cambios.patch

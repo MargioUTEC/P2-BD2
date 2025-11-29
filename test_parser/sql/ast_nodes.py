@@ -6,9 +6,7 @@ from dataclasses import dataclass
 from typing import Any, List, Optional, Union
 
 
-# ============================================================
 # Tipos de condición
-# ============================================================
 
 @dataclass
 class ConditionNode:
@@ -67,9 +65,7 @@ class ConditionComplexNode:
 ConditionType = Union[ConditionNode, BetweenConditionNode, ConditionComplexNode]
 
 
-# ============================================================
-# Nodo principal de consulta: SELECT ... FROM ... WHERE ...
-# ============================================================
+#Nodo principal!
 
 @dataclass
 class SelectWhereNode:
