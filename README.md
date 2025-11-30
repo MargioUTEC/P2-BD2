@@ -82,6 +82,128 @@ Una vez finalizado el proceso de agrupamiento, el diccionario queda conformado p
 | KNN con Indexación Invertida | Optimización basada en codewords + TF-IDF + heap |
 
 ---
+# Parser SQL
+
+Este módulo implementa un parser SQL reducido para consultar `metadata.db`.  
+Incluye una gramática Lark, un AST propio y un motor de ejecución seguro basado en SQL parametrizado.
+
+---
+
+## 1. Objetivo
+
+Permitir consultas como:
+
+```sql
+SELECT * FROM metadata WHERE genre = "Rock" AND year >= 2010;
+```
+
+o condiciones abreviadas:
+
+```
+artist = "Queen" AND year >= 2000
+```
+
+Ambas se traducen internamente a SQL seguro.
+
+---
+
+## 2. Componentes
+
+```
+audio/sql/
+│── grammar_sql.lark          ← Gramática SQL
+│── parser_sql.py             ← Parser Lark → AST
+│── ast_nodes.py              ← Nodos del AST
+└── metadata_query_engine.py  ← Motor de ejecución
+```
+
+---
+
+## 3. Gramática Soportada
+
+- `SELECT columnas FROM metadata WHERE condición`
+- Operadores: `= != < > <= >=`
+- `BETWEEN`
+- `AND`, `OR`
+- Strings `"texto"`
+- Enteros y floats  
+- `*` para columnas completas
+
+Limitaciones:
+- Sin JOIN, funciones, INSERT/UPDATE/DELETE.
+
+---
+
+## 4. AST (Árbol de Sintaxis)
+
+Nodos principales:
+
+### `SelectWhereNode`
+Representa una consulta `SELECT`.
+
+### `ConditionNode`
+Condición simple `col OP valor`.
+
+### `BetweenConditionNode`
+`year BETWEEN 1990 AND 2000`.
+
+### `ConditionComplexNode`
+Árbol binario con `AND` / `OR`.
+
+---
+
+## 5. Motor de Ejecución
+
+`MetadataQueryEngine`:
+
+- Normaliza `track_id` a 6 dígitos.
+- Valida tabla (`metadata`) y columnas permitidas.
+- Traduce el AST a SQL **parametrizado**.
+- Ejecuta la consulta contra SQLite.
+
+Ejemplo AST -> SQL:
+
+```
+genre = "Rock" AND year >= 2005
+```
+
+SQL generado:
+
+```sql
+SELECT * FROM metadata
+WHERE (genre = ? AND year >= ?);
+```
+
+Parámetros:
+
+```
+["Rock", 2005]
+```
+
+---
+
+## 6. Flujo Completo
+
+1. Usuario ingresa SQL o condiciones abreviadas.  
+2. `ParserSQL` → AST propio.  
+3. `MetadataQueryEngine` traduce a SQL seguro.  
+4. Se ejecuta contra `metadata.db`.  
+5. Retorna filas como diccionarios.
+
+
+---
+
+## 7. Uso
+
+```python
+from audio.sql.metadata_query_engine import MetadataQueryEngine
+
+engine = MetadataQueryEngine()
+result = engine.run_query('artist = "Queen" AND year >= 2000')
+print(result["rows"])
+```
+
+---
 
 ## Fronted
 
