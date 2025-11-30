@@ -11,15 +11,12 @@ Configuración para el módulo AUDIO:
 
 from pathlib import Path
 
-# ============================================================
-# RUTA EXTERNA donde está el dataset FMA SMALL (mp3)
-# ============================================================
+# Ir a la sección data del README.md de esta repo "https://github.com/mdeff/fma/tree/master" para cambiar esta ruta localmente
+#Para esta ruta usar el archivo fma_small.zip
+
 #AUDIO_DIR = Path(r"D:\fma_small")
 AUDIO_DIR = Path(r"/Users/margio/Downloads/fma_small")
 
-# ============================================================
-# Estructura interna del proyecto (audio/)
-# ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent
 

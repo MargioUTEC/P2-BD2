@@ -186,9 +186,9 @@ En este caso de búsqueda de audio, el rendimiento del índice depende en gran m
 
 
 ## Ejecución mediante docker
-Para levantar el backend, frontend y la base de datos sin instalar dependencias localmente:
+Para levantar el backend, frontend y la base de datos sin instalar dependencias localmente, antes debemos cambiar la ruta de **AUDIO_DIR** en los archivos `audio/config.py` y `audio/config_metadata.py` de manera local para evitar sobrecargar el repositorio. Luego de ello, procedemos 
 
-1. Construimos y levantamos los servicios:
+1. Construimos y levantamos los servicios con:
 
    ```bash
    docker compose up --build
