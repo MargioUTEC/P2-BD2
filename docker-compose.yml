@@ -1,6 +1,28 @@
-version: '3.8'
-
 services:
+  backend:
+    build:
+      context: .
+      dockerfile: dockerfile.backend
+    container_name: proyecto2_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: .
+      dockerfile: dockerfile.frontend
+    container_name: proyecto2_frontend
+    restart: always
+    environment:
+      - API_BASE_URL=http://backend:8000
+    ports:
+      - "8001:8001"
+    depends_on:
+      - backend
+
   db:
     image: pgvector/pgvector:pg16
     container_name: proyecto2_db
