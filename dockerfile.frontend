@@ -2,16 +2,17 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY requirements-front.txt ./
+COPY requirements-front.txt requirements-backend.txt ./
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential \
-    && pip install --no-cache-dir -r requirements-front.txt \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        ffmpeg \
+        libsndfile1 \
+    && pip install --no-cache-dir -r requirements-backend.txt -r requirements-front.txt \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-COPY api ./api
-COPY api2 ./api2
-COPY frontend ./frontend
+COPY . .
 
 EXPOSE 8001
 
