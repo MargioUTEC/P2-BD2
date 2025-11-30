@@ -5,6 +5,9 @@
 // ======================================================
 
 document.addEventListener("DOMContentLoaded", () => {
+    const API_BASE = window.API_BASE_URL || "";
+
+
     // Elementos comunes
     const textStatus     = document.getElementById("text-status");
     const textResultsDiv = document.getElementById("text-results");
@@ -207,11 +210,11 @@ document.addEventListener("DOMContentLoaded", () => {
             textSelectedColumns = null;
 
             textSimpleBtn.disabled = true;
-            textStatus.textContent = `Consultando /api2/text/search?q=${qRaw}&k=${k}...`;
+            textStatus.textContent = `Consultando ${API_BASE}/api2/text/search?q=${qRaw}&k=${k}...`;
             textResultsDiv.innerHTML = "";
 
             try {
-                const url = `/api2/text/search?q=${encodeURIComponent(qRaw)}&k=${k}`;
+                const url = `${API_BASE}/api2/text/search?q=${encodeURIComponent(qRaw)}&k=${k}`;
                 const resp = await fetch(url);
                 if (!resp.ok) throw new Error(`Error HTTP ${resp.status}`);
 
@@ -258,11 +261,11 @@ document.addEventListener("DOMContentLoaded", () => {
             let k = extractTextLimitFromSql(sqlText, 10);
 
             textSqlBtn.disabled = true;
-            textStatus.textContent = `Consultando /api2/text/search?q=${q}&k=${k}...`;
+            textStatus.textContent = `Consultando ${API_BASE}/api2/text/search?q=${q}&k=${k}...`;
             textResultsDiv.innerHTML = "";
 
             try {
-                const url = `/api2/text/search?q=${encodeURIComponent(q)}&k=${k}`;
+                const url = `${API_BASE}/api2/text/search?q=${encodeURIComponent(q)}&k=${k}`;
                 const resp = await fetch(url);
                 if (!resp.ok) throw new Error(`Error HTTP ${resp.status}`);
 

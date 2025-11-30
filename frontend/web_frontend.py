@@ -1,5 +1,5 @@
 # frontend/web_frontend.py
-
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -23,18 +23,23 @@ from api2.main2 import app as text_app
 # ================================
 
 ROOT_DIR = Path(__file__).resolve().parent
-app = FastAPI(title="Proyecto 2 - Frontend + API")
+#app = FastAPI(title="Proyecto 2 - Frontend + API")
 
 
 # ================================
 # Montaje de Backends
 # ================================
 
-# Backend 1: Audio / Metadata / Fusion
-app.mount("/api", backend_app)
+# # Backend 1: Audio / Metadata / Fusion
+# app.mount("/api", backend_app)
 
-# Backend 2: Búsqueda de Texto (Inverted Index)
-app.mount("/api2", text_app)
+# # Backend 2: Búsqueda de Texto (Inverted Index)
+# app.mount("/api2", text_app)
+
+
+
+API_BASE_URL = os.getenv("API_BASE_URL", "")
+app = FastAPI(title="Proyecto 2 - Frontend")
 
 
 # ================================
@@ -59,4 +64,6 @@ async def index(request: Request):
     """
     Página principal: UI de audio + metadata + texto.
     """
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(
+        "index.html", {"request": request, "api_base_url": API_BASE_URL}
+    )

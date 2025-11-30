@@ -65,6 +65,9 @@ document.querySelectorAll(".tab-button").forEach((btn) => {
 // Búsqueda por Audio
 // ======================================================
 
+const API_BASE = window.API_BASE_URL || "";
+
+
 const audioFileInput = document.getElementById("audio-file");
 const audioTopKInput = document.getElementById("audio-topk");
 const audioSqlTextarea = document.getElementById("audio-sql-example");
@@ -296,7 +299,7 @@ if (audioSearchBtn) {
                     params.set("q", metadataQuery);
                 }
 
-                const url = `/api/fusion/${tid}?${params.toString()}`;
+                const url = `${API_BASE}/api/fusion/${tid}?${params.toString()}`;
                 audioStatus.textContent = `Consultando ${url}...`;
 
                 const searchResp = await fetch(url);
@@ -315,7 +318,7 @@ if (audioSearchBtn) {
                 // ==============================
                 // MODO AUDIO EXTERNO: usamos /api/audio/search_file
                 // ==============================
-                const url = `/api/audio/search_file?k=${topK}`;
+                const url = `${API_BASE}/api/audio/search_file?k=${topK}`;
                 audioStatus.textContent = `Consultando ${url}...`;
 
                 const formData = new FormData();
@@ -347,7 +350,7 @@ if (audioSearchBtn) {
                 let title = "", artist = "", genre = "", year = "";
 
                 try {
-                    const metaResp = await fetch(`/api/metadata/track/${rTid}`);
+                    const metaResp = await fetch(`${API_BASE}/api/metadata/track/${rTid}`);
                     if (metaResp.ok) {
                         const meta = await metaResp.json();
                         const data = meta.data || {};
@@ -443,7 +446,7 @@ function renderAudioResults(results) {
             }
 
             <audio controls style="margin-top:10px; width:100%;">
-                <source src="/api/audio/file/${escapeHtml(res.track_id)}" type="audio/mpeg">
+                <source src="${API_BASE}/api/audio/file/${escapeHtml(res.track_id)}" type="audio/mpeg">
                 Tu navegador no soporta audio.
             </audio>
         `;
@@ -467,7 +470,7 @@ async function renderOriginalAudio(trackId) {
     let year = "";
 
     try {
-        const metaResp = await fetch(`/api/metadata/track/${trackId}`);
+        const metaResp = await fetch(`${API_BASE}/api/metadata/track/${trackId}`);
         if (metaResp.ok) {
             const meta = await metaResp.json();
             const data = meta.data || {};
@@ -499,7 +502,7 @@ async function renderOriginalAudio(trackId) {
             <div class="result-trackid">Track ID: ${escapeHtml(trackId)}</div>
 
             <audio controls style="margin-top:10px; width:100%;">
-                <source src="/api/audio/file/${escapeHtml(trackId)}" type="audio/mpeg">
+                <source src="${API_BASE}/api/audio/file/${escapeHtml(trackId)}" type="audio/mpeg">
                 Tu navegador no soporta audio.
             </audio>
         </div>
@@ -524,12 +527,12 @@ if (metadataBtn) {
         }
 
         const tid = normalizeTid(rawTid);
-        metadataStatus.textContent = `Consultando /api/metadata/track/${tid}...`;
+        metadataStatus.textContent = `Consultando ${API_BASE}/api/metadata/track/${tid}...`;
         metadataResultDiv.innerHTML = "";
         metadataBtn.disabled = true;
 
         try {
-            const resp = await fetch(`/api/metadata/track/${tid}`);
+            const resp = await fetch(`${API_BASE}/api/metadata/track/${tid}`);
             if (resp.status === 404) {
                 metadataStatus.textContent = `No se encontró metadata para ${tid}.`;
                 metadataResultDiv.innerHTML =
@@ -597,7 +600,7 @@ if (metadataSqlBtn) {
         metadataSqlResults.innerHTML = "";
 
         try {
-            const resp = await fetch("/api/metadata/query", {
+            const resp = await fetch(`${API_BASE}/api/metadata/query`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ query: queryText }),
