@@ -1,21 +1,19 @@
 """
 config.py
 ---------
-Configuración para el módulo AUDIO:
+Config for audio module:
  - MFCC
- - histogramas
+ - histograms
  - codebook
- - índices invertidos
- - KNN secuencial
+ - inverted indices
+ - sequential KNN
 """
 
+import os
 from pathlib import Path
 
-# Ir a la sección data del README.md de esta repo "https://github.com/mdeff/fma/tree/master" para cambiar esta ruta localmente
-#Para esta ruta usar el archivo fma_small.zip
-
-#AUDIO_DIR = Path(r"D:\fma_small")
-AUDIO_DIR = Path(r"/Users/margio/Downloads/fma_small")
+# Ruta a audio
+AUDIO_DIR = Path(os.getenv("AUDIO_DIR") or (Path.home() / "Downloads" / "fma_small"))
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -30,7 +28,7 @@ INDEX_INV_DIR   = INDEX_DIR / "inverted"
 RESULTS_DIR     = BASE_DIR / "results"
 DOCS_DIR        = BASE_DIR / "docs"
 
-# Crear directorios
+
 for d in [
     FEATURES_DIR,
     MFCC_DIR,
@@ -44,26 +42,15 @@ for d in [
 ]:
     d.mkdir(parents=True, exist_ok=True)
 
-# ============================================================
-# PARÁMETROS DE AUDIO
-# ============================================================
-
+#parametros de audio
 SAMPLE_RATE = 22050
 N_MFCC = 20
 FRAME_SIZE = 2048
 HOP_LENGTH = 512
 
-# ============================================================
-# PARÁMETROS PARA K-MEANS
-# ============================================================
-
+#parametros para k-means
 K_CODEBOOK = 128
 MAX_KMEANS_ITER = 300
 N_INIT = 10
-
-# ============================================================
-# PARÁMETROS DE BÚSQUEDA
-# ============================================================
-
 TOP_K = 10
 USE_TFIDF = True

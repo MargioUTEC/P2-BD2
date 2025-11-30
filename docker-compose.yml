@@ -5,8 +5,14 @@ services:
       dockerfile: dockerfile.backend
     container_name: proyecto2_backend
     restart: always
+    environment:
+      - AUDIO_DIR=/data/fma_small
+      - METADATA_DIR=/data/fma_metadata
     ports:
       - "8000:8000"
+    volumes:
+      -/Users/margio/Downloads/fma_small:/data/fma_small:ro
+      - /Users/margio/Downloads/fma_metadata:/data/fma_metadata:ro
     depends_on:
       - db
 

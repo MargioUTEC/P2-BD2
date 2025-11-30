@@ -308,8 +308,13 @@ En este caso de búsqueda de audio, el rendimiento del índice depende en gran m
 
 
 ## Ejecución mediante docker
-Para levantar el backend, frontend y la base de datos sin instalar dependencias localmente, antes debemos cambiar la ruta de **AUDIO_DIR** en los archivos `audio/config.py` y `audio/config_metadata.py` de manera local para evitar sobrecargar el repositorio. Luego de ello, procedemos 
+Para levantar el backend, frontend y la base de datos sin instalar dependencias localmente, debemos descargar los archivos **fma_small.zip** y **fma_metadata.zip** que se encuentran en el siguiente repositorio: https://github.com/mdeff/fma.git y descomprimirlos, una vez descomprimidos, vamos a la sección de volumes del `docker-compose.yml`, para colocar las rutas correspondientes. 
 
+> **IMPORTANTE**: procurar que se ubiquen en la carpeta de descargas (Downloads).
+
+Luego de ello, procedemos con la ejecución:
+
+--- 
 1. Construimos y levantamos los servicios con:
 
    ```bash
@@ -324,7 +329,7 @@ Los contenedores creados son:
 - `proyecto2_frontend`: sirve para ver la interfaz web y reenvía las llamadas al backend usando la variable `API_BASE_URL`.
 - `proyecto2_db`: instancia de PostgreSQL con la extensión pgVector.
 
-
+---
 
 ## Estructura de la Repo
 
