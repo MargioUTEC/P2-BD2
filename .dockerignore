@@ -1,0 +1,14 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.sqlite
+*.db
+.env
+.git
+.gitignore
+images
+experimentacion
+Indice_invertido
+postgres_data

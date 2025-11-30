@@ -1,0 +1,18 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements-front.txt ./
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential \
+    && pip install --no-cache-dir -r requirements-front.txt \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY api ./api
+COPY api2 ./api2
+COPY frontend ./frontend
+
+EXPOSE 8001
+
+CMD ["uvicorn", "frontend.web_frontend:app", "--host", "0.0.0.0", "--port", "8001"]
